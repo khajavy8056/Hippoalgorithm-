@@ -128,6 +128,17 @@ class TickManager:
         gc.collect()
 
 
+<<<<<<< HEAD
+=======
+def calc_raw_atr(df, length=14):
+    tr1 = df['High'] - df['Low']
+    tr2 = (df['High'] - df['Close'].shift(1)).abs()
+    tr3 = (df['Low'] - df['Close'].shift(1)).abs()
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    return tr.ewm(alpha=1/length, adjust=False).mean()
+
+
+>>>>>>> 506b6e2 (FINAL V3: fixed calc_raw_atr missing + hardcoded /content paths + real env test 2 years EURUSD/XAUUSD -> 81 signals 43% winrate verified)
 def simulate_race_ps(ticks, dir_signal, sl_price, tp_price, spread_raw):
     """موتور مسابقه‌ی تیک — همان قرارداد داوری بقیه‌ی سلول‌های پروژه."""
     for i in range(len(ticks)):
@@ -797,7 +808,11 @@ def process_labeling_pivot_settlement(datasets, swing_n, ab_min_bars, ab_max_bar
     with open(os.path.join(DATA_DIR, "dataset_metadata.json"), "w", encoding='utf-8') as f:
         json.dump(metadata, f, ensure_ascii=False, indent=4)
 
+<<<<<<< HEAD
     zip_path = shutil.make_archive("/content/HIPO_PivotSettlement_Visuals", 'zip', IMG_DIR) if len(os.listdir(IMG_DIR)) > 0 else None
+=======
+    zip_path = shutil.make_archive(os.path.join(DATA_DIR, "HIPO_PivotSettlement_Visuals"), 'zip', IMG_DIR) if len(os.listdir(IMG_DIR)) > 0 else None
+>>>>>>> 506b6e2 (FINAL V3: fixed calc_raw_atr missing + hardcoded /content paths + real env test 2 years EURUSD/XAUUSD -> 81 signals 43% winrate verified)
 
     stats_df = pd.DataFrame({'Category': list(global_stats.keys()), 'Count': list(global_stats.values())})
     total = global_stats['Total Pivot Settlement Signals']
@@ -1135,7 +1150,11 @@ def run_pivot_optimization_ga(datasets, min_samples_target, population_size, n_g
     history_df = pd.DataFrame(generation_history)
 
     # --- نمودار همگرایی (شبیه نمودار Optimization Result در متاتریدر) ---
+<<<<<<< HEAD
     convergence_path = "/content/HIPO_PivotSettlement_GA_Convergence.png"
+=======
+    convergence_path = os.path.join(DATA_DIR, "GA_Convergence.png")
+>>>>>>> 506b6e2 (FINAL V3: fixed calc_raw_atr missing + hardcoded /content paths + real env test 2 years EURUSD/XAUUSD -> 81 signals 43% winrate verified)
     try:
         fig, ax1 = plt.subplots(figsize=(11, 5), facecolor='#0b0f19')
         ax1.set_facecolor('#0b0f19')
@@ -1176,7 +1195,11 @@ def run_pivot_optimization_ga(datasets, min_samples_target, population_size, n_g
             f"جدولِ زیر روند تکاملِ نسل‌به‌نسل و ۳۰ فردِ برتر را نشان می‌دهد؛ گزارش کامل هم قابل‌دانلود است."
         )
 
+<<<<<<< HEAD
     report_path = "/content/HIPO_PivotSettlement_GA_Optimization_Report.json"
+=======
+    report_path = os.path.join(DATA_DIR, "GA_Report.json")
+>>>>>>> 506b6e2 (FINAL V3: fixed calc_raw_atr missing + hardcoded /content paths + real env test 2 years EURUSD/XAUUSD -> 81 signals 43% winrate verified)
     with open(report_path, "w", encoding="utf-8") as f:
         json.dump({
             'best_config': best_row,
