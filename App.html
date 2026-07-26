@@ -1,0 +1,260 @@
+```html
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ابزار پردازش پلاک پیشرفته | Jimi Architect</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;700&display=swap');
+        body { font-family: 'Vazirmatn', sans-serif; background-color: #0f172a; color: #e2e8f0; }
+        .glass-panel { background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 4px; }
+    </style>
+</head>
+<body class="min-h-screen p-4 lg:p-8 flex flex-col items-center">
+
+    <div class="glass-panel w-full max-w-5xl rounded-2xl p-6 lg:p-8">
+        <div class="text-center mb-8 border-b border-slate-700 pb-6">
+            <h1 class="text-3xl font-bold text-blue-400 mb-2">معماری پردازش بازه پلاک‌ها (ورژن ۲)</h1>
+            <p class="text-slate-400 text-sm">ثابت ماندن ستون تارگت | پردازش درون مرورگر</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-1 space-y-6">
+                <div class="bg-slate-800/50 p-5 rounded-xl border border-slate-700">
+                    <label class="block text-sm font-bold text-emerald-400 mb-3">آپلود فایل دیتابیس</label>
+                    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="block w-full text-sm text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer bg-slate-900 rounded-lg border border-slate-600 p-2">
+                </div>
+
+                <button id="startBtn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition-all disabled:opacity-50 flex justify-center items-center gap-2">
+                    شروع عملیات پردازش
+                </button>
+
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 text-center">
+                        <span class="text-slate-400 block mb-1">ردیف اولیه</span>
+                        <span id="statOriginal" class="font-bold text-white text-xl">0</span>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 text-center">
+                        <span class="text-slate-400 block mb-1">ردیف جدید</span>
+                        <span id="statNew" class="font-bold text-emerald-400 text-xl">0</span>
+                    </div>
+                </div>
+
+                <button id="downloadBtn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-all hidden justify-center items-center gap-2">
+                    دانلود فایل اکسل
+                </button>
+            </div>
+
+            <div class="lg:col-span-2 space-y-6 flex flex-col">
+                <div class="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
+                    <div class="flex justify-between text-sm font-bold mb-2">
+                        <span id="statusText" class="text-blue-400">آماده دریافت فایل...</span>
+                        <span id="progressPercent" class="text-white">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-900 rounded-full h-4 border border-slate-600">
+                        <div id="progressBar" class="bg-gradient-to-l from-blue-400 to-blue-600 h-4 rounded-full transition-all" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800/50 p-1 rounded-xl border border-slate-700 flex-grow flex flex-col min-h-[300px]">
+                    <div class="p-4 border-b border-slate-700 flex justify-between items-center">
+                        <h3 class="font-bold text-emerald-400">مانیتورینگ دیتا (۱۰ ردیف اول)</h3>
+                    </div>
+                    <div class="overflow-x-auto p-4">
+                        <table class="w-full text-sm text-right text-slate-300 whitespace-nowrap">
+                            <thead class="text-xs text-slate-400 uppercase bg-slate-900/50" id="tableHead">
+                                <tr><th class="px-4 py-3 font-medium">دیتا اینجا نمایش داده می‌شود...</th></tr>
+                            </thead>
+                            <tbody id="tableBody" class="divide-y divide-slate-700/50"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const startBtn = document.getElementById('startBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const progressBar = document.getElementById('progressBar');
+        const progressPercent = document.getElementById('progressPercent');
+        const statusText = document.getElementById('statusText');
+        const statOriginal = document.getElementById('statOriginal');
+        const statNew = document.getElementById('statNew');
+        const tableHead = document.getElementById('tableHead');
+        const tableBody = document.getElementById('tableBody');
+
+        let finalProcessedData = [];
+        let originalFileName = "";
+
+        startBtn.addEventListener('click', () => {
+            const file = fileInput.files[0];
+            if (!file) { alert("اول فایل رو آپلود کن رفیق!"); return; }
+
+            originalFileName = file.name.replace(/\.[^/.]+$/, "");
+            resetUIForStart();
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                statusText.innerText = 'در حال اسکن دیتابیس...';
+                setTimeout(() => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array', raw: true });
+                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                        
+                        statOriginal.innerText = jsonData.length.toLocaleString();
+                        if(jsonData.length === 0) return resetUIForStart(false);
+                        
+                        processDataCore(jsonData);
+                    } catch (error) {
+                        alert("خطا در فایل!"); resetUIForStart(false);
+                    }
+                }, 50);
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function processDataCore(originalData) {
+            finalProcessedData = [];
+            const totalRows = originalData.length;
+            
+            const keys = Object.keys(originalData[0]);
+            const colStartKey = keys.find(k => k.trim().includes('از پلاک'));
+            const colEndKey = keys.find(k => k.trim().includes('تا پلاک'));
+
+            if (!colStartKey || !colEndKey) {
+                alert("اخطار: ستون‌های 'از پلاک' و 'تا پلاک' پیدا نشدند.");
+                return resetUIForStart(false);
+            }
+
+            let currentIndex = 0;
+            const chunkSize = 200; 
+
+            statusText.innerText = 'در حال تزریق دیتا در حلقه...';
+
+            function processChunk() {
+                let end = Math.min(currentIndex + chunkSize, totalRows);
+                
+                for (let i = currentIndex; i < end; i++) {
+                    let row = originalData[i];
+                    let startStr = String(row[colStartKey] || "").trim();
+                    let endStr = String(row[colEndKey] || "").trim();
+
+                    if (!startStr || !endStr) {
+                        finalProcessedData.push({ ...row });
+                        continue;
+                    }
+
+                    try {
+                        let maxLen = Math.max(startStr.length, endStr.length);
+                        let startNum = BigInt(startStr);
+                        let endNum = BigInt(endStr);
+
+                        if (startNum > endNum) {
+                            let temp = startNum; startNum = endNum; endNum = temp;
+                        }
+
+                        // معماری آپدیت شده طبق دستور محمد
+                        for (let currentNum = startNum; currentNum <= endNum; currentNum++) {
+                            // کپی دقیق کل ردیف (شامل ستون تا پلاک و بقیه مشخصات)
+                            let newRow = { ...row };
+                            
+                            // فقط ستون "از پلاک" رو با عدد جدیدِ حلقه آپدیت می‌کنیم
+                            // ستون "تا پلاک" خودش همون عدد تارگت (endStr) باقی می‌مونه
+                            newRow[colStartKey] = currentNum.toString().padStart(maxLen, '0');
+                            
+                            finalProcessedData.push(newRow);
+                        }
+                    } catch (e) {
+                        finalProcessedData.push({ ...row });
+                    }
+                }
+
+                currentIndex = end;
+                statNew.innerText = finalProcessedData.length.toLocaleString();
+                
+                let percent = Math.floor((currentIndex / totalRows) * 100);
+                progressBar.style.width = percent + '%';
+                progressPercent.innerText = percent + '%';
+
+                if (currentIndex < totalRows) {
+                    requestAnimationFrame(processChunk);
+                } else {
+                    finishProcessing();
+                }
+            }
+            requestAnimationFrame(processChunk);
+        }
+
+        function finishProcessing() {
+            statusText.innerText = 'عملیات با موفقیت انجام شد.';
+            progressBar.classList.replace('from-blue-400', 'from-emerald-400');
+            progressBar.classList.replace('to-blue-600', 'to-emerald-600');
+            
+            renderPreviewTable(finalProcessedData);
+            downloadBtn.classList.remove('hidden');
+            downloadBtn.classList.add('flex');
+            startBtn.disabled = false; fileInput.disabled = false;
+        }
+
+        function renderPreviewTable(dataArray) {
+            if(dataArray.length === 0) return;
+            const previewData = dataArray.slice(0, 10);
+            const headers = Object.keys(previewData[0]);
+            
+            let headHTML = '<tr>';
+            headers.forEach(h => {
+                // هایلایت کردن ستون‌های کلیدی برای مانیتورینگ بهتر
+                let extraClass = (h.includes('از پلاک') || h.includes('تا پلاک')) ? 'text-emerald-400 bg-slate-800' : 'text-blue-400';
+                headHTML += `<th class="px-4 py-3 font-bold ${extraClass} text-right whitespace-nowrap">${h}</th>`;
+            });
+            headHTML += '</tr>';
+            tableHead.innerHTML = headHTML;
+
+            let bodyHTML = '';
+            previewData.forEach(row => {
+                bodyHTML += '<tr class="hover:bg-slate-700/50 transition-colors border-t border-slate-700/50">';
+                headers.forEach(h => {
+                    let valClass = (h.includes('از پلاک')) ? 'text-emerald-300 font-bold' : '';
+                    bodyHTML += `<td class="px-4 py-3 whitespace-nowrap ${valClass}">${row[h] || ''}</td>`;
+                });
+                bodyHTML += '</tr>';
+            });
+            tableBody.innerHTML = bodyHTML;
+        }
+
+        downloadBtn.addEventListener('click', () => {
+            if (finalProcessedData.length === 0) return;
+            try {
+                const worksheet = XLSX.utils.json_to_sheet(finalProcessedData);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "Processed Data");
+                XLSX.writeFile(workbook, `${originalFileName}_Processed.xlsx`);
+            } catch (err) { alert("خطا در ساخت فایل خروجی."); }
+        });
+
+        function resetUIForStart(isProcessing = true) {
+            startBtn.disabled = isProcessing; fileInput.disabled = isProcessing;
+            downloadBtn.classList.add('hidden'); downloadBtn.classList.remove('flex');
+            progressBar.style.width = '0%'; progressPercent.innerText = '0%';
+            if(!isProcessing) {
+                statusText.innerText = 'آماده دریافت فایل...';
+                statOriginal.innerText = '0'; statNew.innerText = '0';
+                tableBody.innerHTML = '';
+            }
+        }
+    </script>
+</body>
+</html>
+
+
+```
