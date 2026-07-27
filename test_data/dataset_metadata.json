@@ -1,0 +1,9 @@
+{
+    "num_classes": 2,
+    "class_mapping": {
+        "0": "Loss/Timeout (Class 0)",
+        "1": "Clean Win (Class 1)"
+    },
+    "strategy": "Pivot_Settlement_Setup",
+    "features_version": "v23.0"
+}

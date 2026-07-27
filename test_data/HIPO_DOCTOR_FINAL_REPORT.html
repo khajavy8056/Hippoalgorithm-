@@ -1,0 +1,58 @@
+
+<!DOCTYPE html><html lang=fa><head><meta charset=UTF-8><title>HIPO DOCTOR FINAL</title>
+<style>body{font-family:monospace;background:#05080f;color:#e0e6ed;padding:20px;direction:rtl;}h1{color:#00f2ff;text-align:center;}pre{background:#0d1117;padding:15px;border-radius:8px;border:1px solid #333;overflow-x:auto;} .verdict{margin-top:15px;padding:10px;border-radius:8px;} .ok{border:1px solid #00ff88;background:rgba(0,255,136,0.05);} .warn{border:1px solid #ffaa00;background:rgba(255,170,0,0.05);} .err{border:1px solid #ff3366;background:rgba(255,51,102,0.08);}</style></head>
+<body><h1>🩺 HIPO DOCTOR v26 FINAL - گزارش کامل</h1>
+<h2>خروجی کنسول</h2><pre>======================================================================
+🩺 HIPO DOCTOR v26 FINAL — تشخیص کامل
+======================================================================
+
+📁 دیتاست‌ها: ['EURUSD_Labeled.parquet']
+
+----------------------------------------------------------------------
+🔬 بخش 1: آلودگی fillna(0) / warm-up
+----------------------------------------------------------------------
+
+کل نمونه: 81 | Base Rate: 43.210%
+CV: 56 | Calib: -13 | Test: 0
+
+----------------------------------------------------------------------
+🔬 بخش 2: کفایت Embargo/Purge vs max_bars
+----------------------------------------------------------------------
+purge/embargo کافی: 70/70 vs max_bars 60
+
+----------------------------------------------------------------------
+🔬 بخش 3: تفاوت نرخ برد Buy vs Sell
+----------------------------------------------------------------------
+BUY: n=33 WinRate=54.545% CI 37.986%-70.157%
+SELL: n=48 WinRate=35.417% CI 23.433%-49.561%
+z=1.71 p=0.0877
+
+----------------------------------------------------------------------
+🔬 بخش 4: Concept Drift
+----------------------------------------------------------------------
+ثلث 1: n=19 WinRate=36.842% CI 19.149%-58.961%
+ثلث 2: n=19 WinRate=42.105% CI 23.142%-63.724%
+ثلث 3: n=18 WinRate=55.556% CI 33.716%-75.441%
+اول vs آخر: z=-1.14 p=0.2536
+
+----------------------------------------------------------------------
+🔬 بخش 5: ردیف‌های تکراری
+----------------------------------------------------------------------
+ایندکس تکراری: 0 | ردیف تکراری: 0
+
+----------------------------------------------------------------------
+🔬 بخش 6: آموزش واقعی + اهمیت فیچر
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<string>", line 424, in run_doctor_diagnosis
+  File "/usr/local/lib/python3.11/dist-packages/sklearn/model_selection/_split.py", line 1308, in _split
+    raise ValueError(
+ValueError: Too many splits=2 for number of samples=56 with test_size=18 and gap=70.
+
+</pre>
+<h2>خلاصه</h2>
+<div class="verdict err"><h3>❌ بحرانی (1)</h3><ul><li>کرش دکتر: Too many splits=2 for number of samples=56 with test_size=18 and gap=70.</li></ul></div>
+<div class="verdict warn"><h3>⚠️ هشدار (0)</h3><ul></ul></div>
+<div class="verdict ok"><h3>✅ پاس شده (5)</h3><ul><li>NaN قابل‌توجهی نیست.</li><li>purge/embargo (70/70) نسبت به max_bars (60) کافی است. FIXED نسخه از 70 استفاده می‌کند.</li><li>Buy/Sell تفاوتی ندارد.</li><li>Drift دیده نشد.</li><li>تکراری مشکلی نیست.</li></ul></div>
+<div style="margin-top:20px;padding:15px;background:#1a2433;border-radius:8px;"><b>توصیه:</b> اول ❌ ها را فیکس کن، بعد ⚠️ ها. اگر بخش 7 (Label Shuffle) ❌ داد، تمرکز را از تیون مدل بردار و ببر روی پترن/فیچر.</div>
+</body></html>
