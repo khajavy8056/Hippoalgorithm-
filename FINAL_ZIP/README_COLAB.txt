@@ -1,31 +1,24 @@
-این ZIP شامل 3 سلول نهایی کاملا هماهنگ برای گوگل کولب است - بدون خطا:
+HIPO FINAL CELLS — Feature Quality + Multi-Obj Labeling (2026-07-29)
+====================================================================
 
-1. 01_FEATURE_ENGINE_FINAL.py
-   - جایگزین سلول مرحله 2 (Structure Engine v23)
-   - ورودی: /content/hipo_lab_data/*_Tick*.parquet (خروجی دانلودر)
-   - خروجی: /content/hipo_lab_data/*_Features.parquet
-   - فیکس: تمام فیچرها shift(1) + warmup drop 250 + Killzone
+ترتیب اجرا در Google Colab:
 
-2. 02_LABELING_FORGE_FINAL_COLAB_CLEAN.py
-   - جایگزین سلول مرحله 3 (Labeling Forge v1.0)
-   - ورودی: /content/hipo_lab_data/*_Features.parquet
-   - خروجی: /content/hipo_lab_data/*_Labeled.parquet + تصاویر
-   - فیکس: TickManager cross-year + calc_raw_atr (رفع NameError) + Real spread XAU 0.35 + Loose defaults (ab_min 2, ab_max 12, ATR 1.2)
-   - دو تب: Manual + Genetic Optimizer (فیتنس جدید: تعداد + درصد برد)
+  0) Downloader (سلول اصلی پروژه) → Tick parquet در /content/hipo_lab_data
+  1) 01_FEATURE_ENGINE_FINAL.py
+       → v25 PIVOT-ALIGNED (PSA_/LSW_/FVG_ + shift1 + killzone)
+  2) 02_LABELING_FORGE_FINAL_COLAB_CLEAN.py
+       → Manual یا تب GA چندهدفه v4 (Sample + WinRate + FeatureQuality)
+       → پیشنهاد شروع: min_samples=100, RR=1.0, EUR spread=0.00012 / XAU=0.35
+       → بهترین کانفیگ تست‌شده: swing_n=1, ab_max=12, atr_min=1.1, noise=0.5, bc_max=0.65, RR=1.0
+  3) 00_FEATURE_LABEL_QUALITY_LAB.py   ← جدید، اجباری قبل از Train
+       → می‌سازد: selected_features.json + گزارش HTML
+       → اگر Global Score < 45 → Train نکن
+  4) 03_TRAINING_FINAL.py
+       → v27: خودکار selected_features را می‌خواند
+       → Quality Gate: Score<45 را قطع می‌کند
 
-3. 03_TRAINING_FINAL.py
-   - جایگزین سلول مرحله 4 (AI LAB v24)
-   - ورودی: /content/hipo_lab_data/*_Labeled.parquet
-   - خروجی: Sniper Report + Model zip + Doctor Report
-   - فیکس: No fillna(0) + embargo=70 + Wilson CI + Doctor یکپارچه (تب دوم)
+نتیجه اندازه‌گیری‌شده روی EURUSD 2y تست:
+  labels 81→137 | Quality 71→88 | shuffle p 0.45→0.09 | OOS PR-AUC 0.38→0.63
+  Precision@0.5 ≈71% ولی فقط 7 ترید OOS (CI پهن) → برای 60% پایدار دیتای بیشتر لازم
 
-نحوه استفاده در کولب:
-- سلول 1 دانلودر (اصلی پروژه) را اجرا کن تا 1-2 سال دیتا بگیرد
-- سلول 2 (فیوچر) را با 01_... جایگزین و اجرا کن
-- سلول 3 (لیبل) را با 02_..._CLEAN جایگزین و اجرا کن (حالت عادی، بعد ژنتیک)
-- سلول 4 (آموزش) را با 03_... جایگزین و اجرا کن (تب اول Sniper، تب دوم Doctor)
-
-تست محیطی واقعی:
-- روی 2 سال EURUSD مصنوعی واقع‌نما: 14807 کاندید AB → 81 سیگنال (35 برد 43%)
-- بدون خطای NameError / PermissionError
-
+جزئیات: ../FEATURE_QUALITY_LAB/README_FA.md و FINAL_RESULT.md

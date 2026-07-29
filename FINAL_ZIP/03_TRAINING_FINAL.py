@@ -1,5 +1,5 @@
 
-# @title 🎯 HIPO AI LAB [v26.0 FINAL - Sniper + Doctor + WilsonCI + Safe Split] { display-mode: "form" }
+# @title 🎯 HIPO AI LAB [v27.0 SELECTED-FEATURES + Quality Gate - Sniper + Doctor + WilsonCI + Safe Split] { display-mode: "form" }
 # =============================================================================
 # نسخه نهایی کامل - شامل:
 # 1. آموزش Sniper FIXED (بدون fillna(0), embargo=70, Wilson CI)
@@ -90,7 +90,7 @@ def get_safe_splits(n_total, max_bars, test_frac=0.15, calib_frac=0.15):
     return final_idx, calib_start, calib_end, oos_start, embargo
 
 def prepare_features_safe(df_raw, drop_list):
-    features = [c for c in df_raw.columns if c not in drop_list and np.issubdtype(df_raw[c].dtype, np.number)]
+    features = [c for c in df_raw.columns if c not in drop_list and pd.api.types.is_numeric_dtype(df_raw[c])]
     warmup=250
     if len(df_raw)>warmup:
         df_raw = df_raw.iloc[warmup:]
@@ -161,7 +161,25 @@ def run_sniper_training(dataset_names, focus_class, n_folds, purge_gap, n_trees,
         drop_list = ['Target_Class', 'Signal_Dir', 'index', 'level_0', 'Time', 'origin_time', 'origin_price', 'entry_price', 'M1_SL', 'M1_TP', 'M2_SL', 'M2_TP', 'M3_SL', 'M3_TP', 'pair', 'max_bars', 'Raw_ATR', 'rev_cross_idx', 'B_SL', 'B_TP', 'S_SL', 'S_TP', 'Open', 'High', 'Low', 'Close', 'Bid']
         df, features = prepare_features_safe(df_raw_all, drop_list)
         if len(features)==0:
-            features = [c for c in df.columns if c not in drop_list and np.issubdtype(df[c].dtype, np.number)]
+            features = [c for c in df.columns if c not in drop_list and pd.api.types.is_numeric_dtype(df[c])]
+        # 🆕 auto-load selected_features.json from Quality Lab if present
+        sel_path = os.path.join(DATA_DIR, "selected_features.json")
+        if os.path.exists(sel_path):
+            try:
+                sel_obj = json.load(open(sel_path, encoding="utf-8"))
+                sel = sel_obj.get("selected_features") or sel_obj.get("selected") or []
+                gscore = sel_obj.get("global_score", sel_obj.get("score"))
+                if gscore is not None and float(gscore) < 45:
+                    yield log_it(f"⛔ Quality Gate: Global Score={gscore}<45 — Training متوقف. اول فیچر/لیبل را درست کنید.", 0.99, "QualityGate"), "\n".join(logs), None, None
+                    return
+                inter = [f for f in sel if f in features]
+                if len(inter) >= 8:
+                    features = inter
+                    yield log_it(f"✅ selected_features.json لود شد | {len(features)} فیچر | QualityScore={gscore}", 0.08, "FeatureSelect"), "\n".join(logs), None, None
+                else:
+                    yield log_it(f"⚠️ selected_features overlap کم ({len(inter)}) — از همه فیچرها استفاده می‌شود.", 0.08, "FeatureSelect"), "\n".join(logs), None, None
+            except Exception as e:
+                yield log_it(f"⚠️ خواندن selected_features شکست: {e}", 0.08, "FeatureSelect"), "\n".join(logs), None, None
         X = df[features].astype('float32')
         target_c = int(focus_class)
         y = (df['Target_Class'].astype(int)==target_c).astype(int)
@@ -508,7 +526,7 @@ def run_doctor_diagnosis(dataset_names, focus_class, n_folds, purge_gap, embargo
 
 # ==================== Gradio UI FINAL ====================
 with gr.Blocks(theme=gr.themes.Monochrome()) as app:
-    gr.HTML("<div style='text-align:center;padding:20px;background:#05080f;border-radius:15px;border:1px solid #1a2433;'><h1 style='color:#00ff88;margin:0;font-family:monospace;'>🎯 HIPO AI: SNIPER + DOCTOR v26 FINAL</h1><p style='color:#8b949e;'>Safe Split (embargo=70) | No FillNA | Wilson CI | Doctor Integrated</p></div>")
+    gr.HTML("<div style='text-align:center;padding:20px;background:#05080f;border-radius:15px;border:1px solid #1a2433;'><h1 style='color:#00ff88;margin:0;font-family:monospace;'>🎯 HIPO AI: SNIPER + DOCTOR v27 SELECTED</h1><p style='color:#8b949e;'>Safe Split (embargo=70) | No FillNA | Wilson CI | Doctor Integrated</p></div>")
 
     with gr.Tabs():
         with gr.TabItem("🎯 آموزش Sniper (FIXED)"):

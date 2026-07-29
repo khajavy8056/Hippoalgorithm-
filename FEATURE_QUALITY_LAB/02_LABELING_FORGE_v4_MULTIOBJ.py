@@ -1,21 +1,17 @@
-# @title 🧭 HIPO LABELING FORGE [v5.0 COMPLETE — GA Winners>Losers + Feature Quality Report] { display-mode: "form" }
-# =============================================================================
-# سلول کامل لیبل‌گذاری Pivot Settlement — آماده Colab
-# ورودی : /content/hipo_lab_data/*_Features.parquet  (+ Tick files)
-# خروجی : /content/hipo_lab_data/*_Labeled.parquet + گزارش کیفیت فیچر
-#
-# تب‌ها:
-#  1) استخراج دستی
-#  2) اپتیمایز ژنتیک چندهدفه
-#       اهداف سخت/نرم:
-#         • Wins_Class1 > Losses_Class0  (قید اصلی: بردها بیشتر از باخت‌ها)
-#         • تعداد نمونه کافی (min_samples)
-#         • Feature_Quality_Score بالا (هم‌راستایی فیچر↔لیبل)
-#  3) گزارش کیفیت فیچر↔لیبل (بعد از لیبل)
-#
-# هماهنگ با Feature Engine v25 (PSA/LSW/FVG)
-# =============================================================================
+# @title 🧭 HIPO LABELING FORGE [FINAL COLAB v3.1 - FIXED + Coordinated with Feature v24 FIXED] { display-mode: "form" }
+# ✅ 100% هماهنگ با سلول فیوچر v24 FIXED:
+# - DATA_DIR = /content/hipo_lab_data (خروجی فیوچر)
+# - TickManager cross-year FIXED
+# - calc_raw_atr FIXED (رفع NameError)
+# - Real spread XAU 0.35
+# - Loose defaults: ab_min 2, ab_max 12, ATR 1.2, noise 0.5, BC max 0.65, search 100, RR 1.0
+# - Genetic optimizer بهبود یافته
 
+
+
+
+
+# @title 🧭 HIPO LABELING FORGE [Web App Edition v1.0 - Pivot Settlement Engine] { display-mode: "form" }
 
 # =============================================================================
 # ستاپ «پیوت تسویه» (Pivot Settlement Setup) — بر اساس PDF جلیل ضرغام
@@ -807,12 +803,12 @@ def process_labeling_pivot_settlement(datasets, swing_n, ab_min_bars, ab_max_bar
         "num_classes": 2,
         "class_mapping": {0: "Loss/Timeout (Class 0)", 1: "Clean Win (Class 1)"},
         "strategy": "Pivot_Settlement_Setup",
-        "features_version": "v25.0"
+        "features_version": "v23.0"
     }
     with open(os.path.join(DATA_DIR, "dataset_metadata.json"), "w", encoding='utf-8') as f:
         json.dump(metadata, f, ensure_ascii=False, indent=4)
 
-    zip_path = shutil.make_archive(os.path.join(DATA_DIR, "HIPO_PivotSettlement_Visuals"), 'zip', IMG_DIR) if len(os.listdir(IMG_DIR)) > 0 else None
+    zip_path = shutil.make_archive("/content/HIPO_PivotSettlement_Visuals", 'zip', IMG_DIR) if len(os.listdir(IMG_DIR)) > 0 else None
 
     stats_df = pd.DataFrame({'Category': list(global_stats.keys()), 'Count': list(global_stats.values())})
     total = global_stats['Total Pivot Settlement Signals']
@@ -1043,132 +1039,58 @@ def _opt_evaluate_config(loaded_datasets, params, spread_raw):
     return total_signals, total_wins
 
 
-
 def _fast_feature_quality_score(signal_rows, max_feat_probe=25):
-    """امتیاز 0-100: فیچرها چقدر Win/Loss این لیبل را جدا می‌کنند؟"""
-    if not signal_rows or len(signal_rows) < 25:
-        return 0.0
-    try:
-        sdf = pd.DataFrame(signal_rows)
-    except Exception:
-        return 0.0
-    if 'Target_Class' not in sdf.columns:
-        return 0.0
+    if not signal_rows or len(signal_rows) < 25: return 0.0
+    try: sdf = pd.DataFrame(signal_rows)
+    except Exception: return 0.0
+    if 'Target_Class' not in sdf.columns: return 0.0
     y = sdf['Target_Class'].astype(int).values
-    if y.sum() < 5 or (len(y) - y.sum()) < 5:
-        return 0.0
-    drop = {
-        "Open", "High", "Low", "Close", "Volume", "Tick_Up_Count", "Tick_Down_Count",
-        "Bid", "Ask", "Target_Class", "Signal_Dir", "entry_price", "M1_SL", "M1_TP",
-        "max_bars", "pair", "Raw_ATR",
-    }
-    cols = []
+    if y.sum() < 5 or (len(y)-y.sum()) < 5: return 0.0
+    drop = {"Open","High","Low","Close","Volume","Tick_Up_Count","Tick_Down_Count","Bid","Ask","Target_Class","Signal_Dir","entry_price","M1_SL","M1_TP","max_bars","pair","Raw_ATR"}
+    cols=[]
     for c in sdf.columns:
-        if c in drop or str(c).startswith('__'):
-            continue
+        if c in drop or str(c).startswith('__'): continue
         try:
-            if not pd.api.types.is_numeric_dtype(sdf[c]):
-                continue
-        except Exception:
-            continue
+            if not pd.api.types.is_numeric_dtype(sdf[c]): continue
+        except Exception: continue
         cols.append(c)
-    if not cols:
-        return 0.0
-    X = sdf[cols].replace([np.inf, -np.inf], np.nan).fillna(sdf[cols].median(numeric_only=True))
-    scores = []
+    if not cols: return 0.0
+    X=sdf[cols].replace([np.inf,-np.inf],np.nan).fillna(sdf[cols].median(numeric_only=True))
+    scores=[]
     for c in cols:
-        v = X[c].values.astype(np.float64)
-        if np.std(v) < 1e-12:
-            continue
-        r = np.corrcoef(v, y)[0, 1]
-        if np.isnan(r):
-            continue
-        order = np.argsort(v)
-        yo = y[order]
-        n_pos = float(yo.sum())
-        n_neg = float(len(yo) - n_pos)
-        if n_pos < 1 or n_neg < 1:
-            continue
-        ranks = np.arange(1, len(yo) + 1, dtype=np.float64)
-        auc = (ranks[yo == 1].sum() - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg)
-        auc = max(float(auc), 1.0 - float(auc))
-        q = 0.6 * float(np.clip((auc - 0.5) / 0.15, 0, 1)) + 0.4 * float(np.clip(abs(r) / 0.25, 0, 1))
-        scores.append(q)
-    if not scores:
-        return 0.0
-    scores = sorted(scores, reverse=True)
-    top = scores[:max_feat_probe]
-    mean_top = float(np.mean(top))
-    n_strong = sum(1 for s in scores if s >= 0.45)
-    cov = min(1.0, n_strong / 8.0)
-    sf = float(np.clip(np.log1p(len(y)) / np.log1p(800), 0.4, 1.0))
-    return float(np.clip(100.0 * mean_top * (0.7 + 0.3 * cov) * sf, 0, 100))
+        v=X[c].values.astype(np.float64)
+        if np.std(v)<1e-12: continue
+        r=np.corrcoef(v,y)[0,1]
+        if np.isnan(r): continue
+        order=np.argsort(v); yo=y[order]; np_=float(yo.sum()); nn=float(len(yo)-np_)
+        if np_<1 or nn<1: continue
+        ranks=np.arange(1,len(yo)+1,dtype=np.float64)
+        auc=(ranks[yo==1].sum()-np_*(np_+1)/2)/(np_*nn); auc=max(float(auc),1-float(auc))
+        q=0.6*float(np.clip((auc-0.5)/0.15,0,1))+0.4*float(np.clip(abs(r)/0.25,0,1)); scores.append(q)
+    if not scores: return 0.0
+    scores=sorted(scores, reverse=True); top=scores[:max_feat_probe]
+    mean_top=float(np.mean(top)); n_strong=sum(1 for s in scores if s>=0.45)
+    cov=min(1.0,n_strong/8.0); sf=float(np.clip(np.log1p(len(y))/np.log1p(800),0.4,1.0))
+    return float(np.clip(100*mean_top*(0.7+0.3*cov)*sf,0,100))
 
-
-def _opt_fitness(total_signals, wins, min_samples, feature_quality=0.0,
-                 require_wins_gt_losses=True, min_winrate=0.50,
-                 w_win_edge=0.40, w_count=0.25, w_feat=0.35):
-    """
-    فیتنس v5 — اهداف اصلی (طبق خواسته):
-      1) Wins > Losses  (بردها بیشتر از باخت‌ها) — قید سخت اگر require_wins_gt_losses
-      2) Feature_Quality_Score بالا (فیچرها بتوانند Win/Loss را جدا کنند)
-      3) تعداد نمونه کافی (min_samples)
-
-    اگر Wins <= Losses → فیتنس منفی بزرگ (رد می‌شود مگر require=False).
-    """
-    if total_signals <= 0:
-        return -1_000_000.0
-
-    losses = total_signals - wins
-    p = wins / total_signals
-    win_edge = wins - losses  # >0 یعنی بردها بیشتر
-
-    # ---- قید سخت: بردها باید بیشتر از باخت‌ها باشند ----
-    if require_wins_gt_losses and wins <= losses:
-        # هنوز رتبه‌بندی نسبی برای GA: نزدیک‌تر به تساوی کمی بهتر از فاجعه
-        return -500_000.0 - float(losses - wins) - (100.0 - feature_quality) * 0.05
-
-    # ---- قید سخت: حداقل نمونه ----
+def _opt_fitness(total_signals, wins, min_samples, feature_quality=0.0, min_winrate=0.30, w_count=0.35, w_winrate=0.35, w_feat=0.30):
+    """Multi-objective: sample count + class1 winrate + feature quality alignment."""
+    if total_signals == 0: return -1_000_000.0
     if total_signals < min_samples:
-        # اگر Wins>Losses ولی نمونه کم: منفی ملایم‌تر
-        bonus_edge = max(0.0, float(win_edge)) * 2.0
-        return -float(min_samples - total_signals) + bonus_edge - (100.0 - feature_quality) * 0.1
+        return -float(min_samples - total_signals) - (100.0 - feature_quality) * 0.1
+    p = wins / total_signals
+    count_score = 100.0 * float(np.clip(np.log1p(total_signals) / np.log1p(max(min_samples * 3, 2000)), 0, 1))
+    win_bonus = 20.0 * float(np.clip(np.log1p(wins) / np.log1p(max(min_samples * 0.45, 400)), 0, 1))
+    if p < min_winrate: wr_score = 40.0 * (p / max(min_winrate, 1e-6))
+    else:
+        wr_score = 40.0 + 60.0 * float(np.clip((p - min_winrate) / (0.55 - min_winrate + 1e-9), 0, 1))
+        if p > 0.70 and total_signals < min_samples * 1.5: wr_score *= 0.85
+    feat_score = float(np.clip(feature_quality, 0, 100))
+    blended = w_count * (count_score + win_bonus) + w_winrate * wr_score + w_feat * feat_score
+    harmony = 1.0 - 0.15 * (abs(count_score - wr_score) + abs(wr_score - feat_score) + abs(count_score - feat_score)) / 200.0
+    return float(blended * float(np.clip(harmony, 0.7, 1.05)))
 
-    # ---- جزء لبه برد (Wins - Losses و WinRate) ----
-    # تشویق قوی برای p > 0.5
-    edge_ratio = win_edge / total_signals  # در [-1,1]، اینجا >0
-    wr_score = 100.0 * float(np.clip((p - 0.50) / 0.20, 0, 1))  # 50%→0 ، 70%→100
-    edge_count_score = 100.0 * float(np.clip(np.log1p(max(0, win_edge)) / np.log1p(max(min_samples * 0.2, 50)), 0, 1))
-    win_component = 0.55 * wr_score + 0.45 * edge_count_score
 
-    # ---- جزء تعداد ----
-    count_score = 100.0 * float(np.clip(np.log1p(total_signals) / np.log1p(max(min_samples * 3, 1500)), 0, 1))
-    # تعداد برد خام
-    wins_score = 100.0 * float(np.clip(np.log1p(wins) / np.log1p(max(min_samples * 0.55, 200)), 0, 1))
-    count_component = 0.6 * count_score + 0.4 * wins_score
-
-    # ---- جزء کیفیت فیچر ----
-    feat_component = float(np.clip(feature_quality, 0, 100))
-
-    # نرمال وزن
-    wsum = float(w_win_edge + w_count + w_feat) + 1e-9
-    w1, w2, w3 = w_win_edge / wsum, w_count / wsum, w_feat / wsum
-    blended = w1 * win_component + w2 * count_component + w3 * feat_component
-
-    # هماهنگی: هر سه باید با هم بالا بروند
-    harmony = 1.0 - 0.12 * (
-        abs(win_component - count_component) + abs(count_component - feat_component) + abs(win_component - feat_component)
-    ) / 200.0
-    harmony = float(np.clip(harmony, 0.75, 1.08))
-
-    # بونوس اضافی اگر p>=0.55 و FQ>=45
-    bonus = 0.0
-    if p >= 0.55 and feature_quality >= 45:
-        bonus = 8.0
-    if p >= 0.60 and feature_quality >= 55:
-        bonus = 15.0
-
-    return float(blended * harmony + bonus)
 
 
 def _opt_evaluate_config_with_rows(loaded_datasets, params, spread_raw):
@@ -1251,7 +1173,7 @@ def run_pivot_optimization_ga(datasets, min_samples_target, population_size, n_g
         for ind in population:
             total_signals, wins, _rows = _opt_evaluate_config_with_rows(loaded_datasets, ind, float(spread_raw))
             fq = _fast_feature_quality_score(_rows) if total_signals >= 25 else 0.0
-            fit = _opt_fitness(total_signals, wins, int(min_samples_target), feature_quality=fq, require_wins_gt_losses=True, min_winrate=0.50)
+            fit = _opt_fitness(total_signals, wins, int(min_samples_target), feature_quality=fq)
             step += 1
             progress(step / total_steps, desc=f"🧬 نسل {gen + 1}/{n_generations} | فرد {len(evaluated) + 1}/{population_size}")
 
@@ -1261,16 +1183,11 @@ def run_pivot_optimization_ga(datasets, min_samples_target, population_size, n_g
             row = dict(ind)
             row['spread_raw'] = float(spread_raw)
             row.update({
-                'Generation': gen + 1,
-                'Total_Signals': total_signals,
-                'Wins_Class1': wins,
-                'Losses_Class0': losses,
-                'Win_Edge': int(wins - losses),
-                'Class1_%': round(class1_pct, 2),
-                'Wins_GT_Losses': bool(wins > losses),
+                'Generation': gen + 1, 'Total_Signals': total_signals, 'Wins_Class1': wins,
+                'Losses_Class0': losses, 'Class1_%': round(class1_pct, 2),
                 'Meets_Min_Samples': total_signals >= int(min_samples_target),
                 'Feature_Quality': round(fq, 2),
-                'Fitness': round(fit, 2),
+                'Fitness': round(fit, 2)
             })
 
             evaluated.append((fit, ind))
@@ -1289,12 +1206,7 @@ def run_pivot_optimization_ga(datasets, min_samples_target, population_size, n_g
             'Best_Fitness': round(gen_fitnesses[0], 2),
             'Avg_Fitness': round(float(np.mean(gen_fitnesses)), 2),
             'Best_Total_Signals': gen_rows[0]['Total_Signals'],
-            'Best_Wins': gen_rows[0]['Wins_Class1'],
-            'Best_Losses': gen_rows[0]['Losses_Class0'],
-            'Best_Win_Edge': gen_rows[0].get('Win_Edge', gen_rows[0]['Wins_Class1'] - gen_rows[0]['Losses_Class0']),
             'Best_Class1_%': gen_rows[0]['Class1_%'],
-            'Best_Feature_Quality': gen_rows[0].get('Feature_Quality', 0),
-            'Best_Wins_GT_Losses': gen_rows[0].get('Wins_GT_Losses', False),
         })
 
         if gen == n_generations - 1:
@@ -1320,7 +1232,7 @@ def run_pivot_optimization_ga(datasets, min_samples_target, population_size, n_g
     history_df = pd.DataFrame(generation_history)
 
     # --- نمودار همگرایی (شبیه نمودار Optimization Result در متاتریدر) ---
-    convergence_path = os.path.join(DATA_DIR, "HIPO_PivotSettlement_GA_Convergence.png")
+    convergence_path = "/content/HIPO_PivotSettlement_GA_Convergence.png"
     try:
         fig, ax1 = plt.subplots(figsize=(11, 5), facecolor='#0b0f19')
         ax1.set_facecolor('#0b0f19')
@@ -1329,8 +1241,8 @@ def run_pivot_optimization_ga(datasets, min_samples_target, population_size, n_g
         ax1.plot(history_df['Generation'], history_df['Best_Fitness'], color='#00ffcc', linewidth=2, marker='o', label='بهترین فیتنس نسل')
         ax1.plot(history_df['Generation'], history_df['Avg_Fitness'], color='#7000ff', linewidth=1.5, linestyle='--', label='میانگین فیتنس نسل')
         ax1.set_xlabel('نسل (Generation)', color='white')
-        ax1.set_ylabel('فیتنس (Wins>Losses + FeatureQuality)', color='white')
-        ax1.set_title('همگرایی GA v5 — Wins>Losses + Feature Quality', color='#00f2ff', fontweight='bold')
+        ax1.set_ylabel('فیتنس (بردها × درصد وین‌ریت)', color='white')
+        ax1.set_title('همگرایی الگوریتم ژنتیک', color='#00f2ff', fontweight='bold')
         ax1.legend(facecolor='#161b22', labelcolor='white')
         ax1.grid(alpha=0.15)
         plt.tight_layout()
@@ -1340,51 +1252,28 @@ def run_pivot_optimization_ga(datasets, min_samples_target, population_size, n_g
         plt.close('all')
         convergence_path = None
 
-    # اولویت: min_samples + Wins>Losses
-    qualifying = leaderboard_df[
-        (leaderboard_df['Meets_Min_Samples'] == True) & (leaderboard_df.get('Wins_GT_Losses', False) == True)
-    ] if 'Wins_GT_Losses' in leaderboard_df.columns else leaderboard_df[leaderboard_df['Meets_Min_Samples'] == True]
-    if 'Wins_GT_Losses' in leaderboard_df.columns:
-        q_edge = leaderboard_df[(leaderboard_df['Meets_Min_Samples'] == True) & (leaderboard_df['Wins_GT_Losses'] == True)]
-        q_sample = leaderboard_df[leaderboard_df['Meets_Min_Samples'] == True]
-    else:
-        q_edge = leaderboard_df.iloc[0:0]
-        q_sample = leaderboard_df[leaderboard_df['Meets_Min_Samples'] == True]
-
-    if len(q_edge) > 0:
-        best_row = q_edge.sort_values('Fitness', ascending=False).iloc[0].to_dict()
+    qualifying = leaderboard_df[leaderboard_df['Meets_Min_Samples'] == True]
+    if len(qualifying) == 0:
         summary = (
-            f"🏆 بهترین فرد GA v5 (نسل {int(best_row['Generation'])} | "
-            f"{n_generations}×{population_size}={total_steps} ارزیابی)\n\n"
-            f"   ✅ Wins > Losses  برقرار است\n"
-            f"   • Total Signals: **{int(best_row['Total_Signals'])}**\n"
-            f"   • Wins (Class1): **{int(best_row['Wins_Class1'])}**\n"
-            f"   • Losses (Class0): **{int(best_row['Losses_Class0'])}**\n"
-            f"   • Win Edge (W-L): **{int(best_row.get('Win_Edge', best_row['Wins_Class1']-best_row['Losses_Class0']))}**\n"
-            f"   • WinRate: **{best_row['Class1_%']}%**\n"
-            f"   • Feature Quality: **{best_row.get('Feature_Quality', 0)}/100**\n"
-            f"   • Fitness: **{best_row['Fitness']}**\n\n"
-            f"بعد از Apply، تب «گزارش کیفیت فیچر» را اجرا کنید."
+            f"⚠️ در هیچ‌کدام از {n_generations} نسل ({total_steps} ارزیابی) به حداقل "
+            f"{int(min_samples_target)} نمونه نرسیدیم.\n"
+            f"نزدیک‌ترین فرد {int(leaderboard_df.iloc[0]['Total_Signals'])} نمونه داشت.\n"
+            f"➡️ پیشنهاد: حداقل نمونه را کم کنید، تعداد نسل/جمعیت را زیاد کنید، یا داده‌ی بیشتری اضافه کنید."
         )
-    elif len(q_sample) > 0:
-        best_row = q_sample.sort_values('Fitness', ascending=False).iloc[0].to_dict()
-        summary = (
-            f"⚠️ به min_samples رسیدیم ولی **Wins > Losses** در بهترین‌ها برقرار نشد.\n"
-            f"   Total={int(best_row['Total_Signals'])} | W={int(best_row['Wins_Class1'])} | "
-            f"L={int(best_row['Losses_Class0'])} | WR={best_row['Class1_%']}% | "
-            f"FQ={best_row.get('Feature_Quality', 0)}\n"
-            f"➡️ RR را کم کنید (1.0)، نسل/جمعیت را زیاد کنید، یا spread را واقعی بگذارید."
-        )
+        best_row = leaderboard_df.sort_values('Total_Signals', ascending=False).iloc[0].to_dict()
     else:
-        best_row = leaderboard_df.sort_values('Fitness', ascending=False).iloc[0].to_dict()
+        best_row = qualifying.sort_values('Fitness', ascending=False).iloc[0].to_dict()
         summary = (
-            f"⚠️ در {n_generations} نسل به حداقل {int(min_samples_target)} نمونه نرسیدیم.\n"
-            f"نزدیک‌ترین: n={int(best_row['Total_Signals'])} WR={best_row['Class1_%']}% "
-            f"FQ={best_row.get('Feature_Quality', 0)}\n"
-            f"➡️ min_samples را کم کنید یا قیف را شل‌تر کنید."
+            f"🏆 بهترین فرد یافت‌شده توسط الگوریتم ژنتیک (نسل {int(best_row['Generation'])}، "
+            f"از بین {n_generations} نسل × {population_size} جمعیت = {total_steps} ارزیابی):\n"
+            f"   • تعداد کل سیگنال‌ها: {int(best_row['Total_Signals'])}\n"
+            f"   • تعداد بردهای کلاس ۱: {int(best_row['Wins_Class1'])}\n"
+            f"   • درصد وین‌ریت: {best_row['Class1_%']}%\n"
+            f"   • فیتنس (بردها × درصد وین‌ریت): {best_row['Fitness']}\n"
+            f"جدولِ زیر روند تکاملِ نسل‌به‌نسل و ۳۰ فردِ برتر را نشان می‌دهد؛ گزارش کامل هم قابل‌دانلود است."
         )
 
-    report_path = os.path.join(DATA_DIR, "HIPO_PivotSettlement_GA_Optimization_Report.json")
+    report_path = "/content/HIPO_PivotSettlement_GA_Optimization_Report.json"
     with open(report_path, "w", encoding="utf-8") as f:
         json.dump({
             'best_config': best_row,
@@ -1396,7 +1285,7 @@ def run_pivot_optimization_ga(datasets, min_samples_target, population_size, n_g
             'datasets': datasets
         }, f, ensure_ascii=False, indent=2, default=str)
 
-    display_cols = ['Generation', 'Total_Signals', 'Wins_Class1', 'Losses_Class0', 'Win_Edge', 'Class1_%', 'Wins_GT_Losses', 'Feature_Quality', 'Meets_Min_Samples', 'Fitness']
+    display_cols = ['Generation', 'Total_Signals', 'Wins_Class1', 'Class1_%', 'Feature_Quality', 'Meets_Min_Samples', 'Fitness']
     other_cols = [c for c in leaderboard_df.columns if c not in display_cols]
     top_table = leaderboard_df[display_cols + other_cols].head(30)
 
@@ -1428,365 +1317,97 @@ def apply_best_optimization_config(best_config_state, datasets, progress=gr.Prog
     )
 
 
-
-
-# =============================================================================
-# 8C. گزارش کیفیت فیچر ↔ لیبل (بعد از لیبل‌گذاری)
-# =============================================================================
-_FQ_DROP = {
-    "Open", "High", "Low", "Close", "Volume", "Tick_Up_Count", "Tick_Down_Count",
-    "Bid", "Ask", "Target_Class", "Signal_Dir", "entry_price", "M1_SL", "M1_TP",
-    "max_bars", "pair", "Raw_ATR", "index", "level_0", "Time",
-}
-
-def _fq_is_num(s):
-    try:
-        return bool(pd.api.types.is_numeric_dtype(s))
-    except Exception:
-        return False
-
-def run_feature_label_quality_report(datasets, max_features=35, min_quality=25, progress=gr.Progress()):
-    """
-    گزارش کامل کیفیت فیچرها نسبت به لیبل‌های ساخته‌شده.
-    خروجی: selected_features.json + HTML + جدول رتبه‌بندی
-    """
-    if not datasets or "No Data Found" in datasets:
-        return "❌ دیتاست لیبل‌شده یافت نشد. اول Manual یا Apply GA را بزنید.", None, None, None, None
-
-    progress(0.05, desc="Loading labeled...")
-    frames = []
-    for name in datasets:
-        # accept both bare name and with _Labeled
-        base = name.replace("_Labeled.parquet", "").replace("_Labeled", "")
-        path = os.path.join(DATA_DIR, f"{base}_Labeled.parquet")
-        # also if user selected filename
-        alt = os.path.join(DATA_DIR, name if name.endswith(".parquet") else "")
-        if os.path.exists(path):
-            d = pd.read_parquet(path)
-            d["__dataset__"] = base
-            frames.append(d)
-        elif alt and os.path.exists(alt):
-            d = pd.read_parquet(alt)
-            d["__dataset__"] = base
-            frames.append(d)
-    if not frames:
-        # try glob all labeled
-        labs = glob.glob(os.path.join(DATA_DIR, "*_Labeled.parquet"))
-        for path in labs:
-            d = pd.read_parquet(path)
-            d["__dataset__"] = os.path.basename(path).replace("_Labeled.parquet", "")
-            frames.append(d)
-    if not frames:
-        return "❌ هیچ *_Labeled.parquet پیدا نشد.", None, None, None, None
-
-    df = pd.concat(frames, axis=0).sort_index()
-    if "Target_Class" not in df.columns:
-        return "❌ ستون Target_Class نیست.", None, None, None, None
-
-    n = len(df)
-    wins = int((df["Target_Class"] == 1).sum())
-    losses = n - wins
-    wr = wins / max(1, n)
-    progress(0.2, desc="Scoring features...")
-
-    y = df["Target_Class"].astype(int).values
-    cols = [c for c in df.columns if c not in _FQ_DROP and not str(c).startswith("__") and _fq_is_num(df[c])]
-    if not cols:
-        return "❌ فیچر عددی نیست.", None, None, None, None
-    X = df[cols].replace([np.inf, -np.inf], np.nan)
-    Xm = X.fillna(X.median(numeric_only=True))
-
-    try:
-        from sklearn.feature_selection import mutual_info_classif
-        mi = mutual_info_classif(Xm.values.astype(np.float64), y, random_state=42,
-                                 n_neighbors=min(5, max(1, n // 20)))
-    except Exception:
-        mi = np.zeros(len(cols))
-
-    rows = []
-    for i, c in enumerate(cols):
-        v = Xm[c].values.astype(np.float64)
-        if np.std(v) < 1e-12:
-            auc, r = 0.5, 0.0
-        else:
-            order = np.argsort(v)
-            yo = y[order]
-            n_pos = float(yo.sum()); n_neg = float(len(yo) - n_pos)
-            if n_pos < 1 or n_neg < 1:
-                auc = 0.5
-            else:
-                ranks = np.arange(1, len(yo) + 1, dtype=np.float64)
-                auc = (ranks[yo == 1].sum() - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg)
-                auc = max(float(auc), 1 - float(auc))
-            r = float(np.corrcoef(v, y)[0, 1])
-            if np.isnan(r):
-                r = 0.0
-        q = (0.45 * float(np.clip((auc - 0.5) / 0.15, 0, 1)) * 100
-             + 0.35 * float(np.clip(mi[i] / 0.12, 0, 1)) * 100
-             + 0.20 * float(np.clip(abs(r) / 0.25, 0, 1)) * 100)
-        verdict = "KEEP_STRONG" if q >= 55 else ("KEEP" if q >= 35 else ("WEAK" if q >= 20 else "DROP"))
-        rows.append(dict(feature=c, AUC_abs=round(auc, 4), MI=round(float(mi[i]), 5),
-                         abs_corr=round(abs(r), 4), quality_0_100=round(q, 2), verdict=verdict))
-    feat_df = pd.DataFrame(rows).sort_values("quality_0_100", ascending=False).reset_index(drop=True)
-
-    # select + dedup
-    progress(0.55, desc="Selecting features...")
-    selected = []
-    cands = feat_df[feat_df["quality_0_100"] >= float(min_quality)]
-    if len(cands) == 0:
-        cands = feat_df.head(int(max_features))
-    for _, row in cands.iterrows():
-        c = row["feature"]
-        if c not in X.columns or len(selected) >= int(max_features):
-            if len(selected) >= int(max_features):
-                break
-            continue
-        v = X[c].fillna(X[c].median()).values
-        ok = True
-        for s in selected:
-            vs = X[s].fillna(X[s].median()).values
-            if np.std(v) < 1e-12 or np.std(vs) < 1e-12:
-                continue
-            rr = abs(np.corrcoef(v, vs)[0, 1])
-            if not np.isnan(rr) and rr >= 0.92:
-                ok = False
-                break
-        if ok:
-            selected.append(c)
-    for _, row in feat_df.iterrows():
-        if str(row["feature"]).startswith(("PSA_", "LSW_", "FVG_", "PS_")) and row["verdict"] in ("KEEP", "KEEP_STRONG"):
-            if row["feature"] not in selected and len(selected) < int(max_features) + 8:
-                selected.append(row["feature"])
-
-    # multivariate probe + shuffle
-    progress(0.7, desc="Multivariate probe + shuffle...")
-    probe = {"cv_pr_auc": 0.0, "lift": 0.0, "shuffle_p": 1.0, "real": False, "base": round(wr, 4)}
-    try:
-        from sklearn.model_selection import TimeSeriesSplit
-        from sklearn.ensemble import HistGradientBoostingClassifier
-        from sklearn.metrics import average_precision_score
-        if len(selected) >= 5 and n >= 30:
-            Xs = X[selected].fillna(X[selected].median()).astype(np.float32)
-            tscv = TimeSeriesSplit(n_splits=min(4, max(2, n // 25)), gap=5)
-            sc = []
-            for tr, te in tscv.split(Xs):
-                if y[tr].sum() < 3 or y[te].sum() < 2:
-                    continue
-                clf = HistGradientBoostingClassifier(max_depth=3, max_iter=80, learning_rate=0.08,
-                                                     min_samples_leaf=max(5, len(tr)//40),
-                                                     l2_regularization=1.0, random_state=42)
-                clf.fit(Xs.iloc[tr], y[tr])
-                sc.append(average_precision_score(y[te], clf.predict_proba(Xs.iloc[te])[:, 1]))
-            if sc:
-                real = float(np.mean(sc))
-                rng = np.random.default_rng(42)
-                sh = []
-                for _ in range(10):
-                    ys = y.copy(); rng.shuffle(ys)
-                    fs = []
-                    for tr, te in tscv.split(Xs):
-                        if ys[tr].sum() < 3 or ys[te].sum() < 2:
-                            continue
-                        clf = HistGradientBoostingClassifier(max_depth=3, max_iter=50, learning_rate=0.08,
-                                                             min_samples_leaf=max(5, len(tr)//40),
-                                                             l2_regularization=1.0, random_state=0)
-                        clf.fit(Xs.iloc[tr], ys[tr])
-                        fs.append(average_precision_score(ys[te], clf.predict_proba(Xs.iloc[te])[:, 1]))
-                    if fs:
-                        sh.append(float(np.mean(fs)))
-                pval = (1 + sum(1 for s in sh if s >= real - 1e-12)) / (len(sh) + 1) if sh else 1.0
-                lift = real / (wr + 1e-9)
-                probe = dict(cv_pr_auc=round(real, 4), cv_std=round(float(np.std(sc)), 4),
-                             base=round(wr, 4), lift=round(lift, 3), shuffle_p=round(float(pval), 4),
-                             real=bool(pval < 0.15 and lift > 1.08))
-    except Exception as e:
-        probe["error"] = str(e)
-
-    # global score
-    top10 = feat_df.head(10)
-    uni = float(np.clip(top10["quality_0_100"].mean() / 70, 0, 1) * 35)
-    multi = 30 * float(np.clip((probe.get("lift", 1) - 1) / 0.5, 0, 1))
-    if not probe.get("real"):
-        multi *= 0.5
-    sample_s = 10 * float(np.clip(np.log1p(n) / np.log1p(2000), 0, 1))
-    # win edge component: reward wins>losses
-    edge_s = 10.0 if wins > losses else (5.0 * wr / 0.5 if wr > 0 else 0.0)
-    edge_s = float(np.clip(edge_s, 0, 15))
-    strong = int((feat_df["verdict"] == "KEEP_STRONG").sum())
-    cover = 10 * float(np.clip(strong / 10, 0, 1))
-    gscore = round(float(np.clip(uni + multi + sample_s + edge_s + cover, 0, 100)), 2)
-
-    if gscore >= 65 and probe.get("real") and wins > losses:
-        interp = "✅ فیچرها با لیبل هم‌راستا هستند، Wins>Losses برقرار است، سیگنال آماری واقعی است. برو Training."
-    elif gscore >= 45 and wins > losses:
-        interp = "⚠️ کیفیت متوسط رو به خوب. Wins>Losses OK است ولی هنوز برای 60% پایدار نمونه/OOS بیشتر لازم است."
-    elif wins <= losses:
-        interp = "❌ بردها ≤ باخت‌ها. اول GA را طوری تنظیم کنید که Wins>Losses شود (RR پایین‌تر، قیف بهتر)."
-    else:
-        interp = "❌ فیچر↔لیبل ضعیف. Feature Engine v25 (PSA/LSW/FVG) را دوباره بسازید و GA را تکرار کنید."
-
-    # save artifacts
-    progress(0.9, desc="Saving reports...")
-    sel_path = os.path.join(DATA_DIR, "selected_features.json")
-    payload = {
-        "selected_features": selected,
-        "global_score": gscore,
-        "probe": probe,
-        "n_samples": n,
-        "wins": wins,
-        "losses": losses,
-        "win_rate": round(wr * 100, 2),
-        "wins_gt_losses": bool(wins > losses),
-        "interpretation": interp,
-        "top_features": feat_df.head(40).to_dict(orient="records"),
-    }
-    with open(sel_path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2, default=str)
-
-    html_path = os.path.join(DATA_DIR, "HIPO_FeatureLabel_Quality_Report.html")
-    color = "#00ff88" if gscore >= 60 else ("#ffcc00" if gscore >= 40 else "#ff3366")
-    edge_badge = "✅ Wins > Losses" if wins > losses else "❌ Wins ≤ Losses"
-    rows_html = "".join(
-        f"<tr><td>{r.feature}</td><td>{r.AUC_abs}</td><td>{r.MI}</td><td>{r.quality_0_100}</td><td>{r.verdict}</td></tr>"
-        for _, r in feat_df.head(40).iterrows()
-    )
-    with open(html_path, "w", encoding="utf-8") as f:
-        f.write(f"""<!DOCTYPE html><html lang=fa><head><meta charset=utf-8><title>Feature↔Label Quality</title>
-<style>body{{background:#0b0f19;color:#e6edf3;font-family:Tahoma,monospace;padding:24px;direction:rtl}}
-h1{{color:#00f2ff}}.score{{font-size:64px;color:{color};font-weight:bold}}
-table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #30363d;padding:6px;text-align:center}}
-th{{background:#21262d;color:#00f2ff}}.badge{{display:inline-block;padding:6px 12px;margin:4px;background:#21262d;border-radius:8px}}</style></head>
-<body><h1>🔬 گزارش کیفیت فیچر ↔ لیبل</h1>
-<div class=score>{gscore}</div>
-<div class=badge>n={n}</div><div class=badge>W={wins}</div><div class=badge>L={losses}</div>
-<div class=badge>WR={wr*100:.1f}%</div><div class=badge>{edge_badge}</div>
-<div class=badge>selected={len(selected)}</div>
-<div class=badge>CV PR-AUC={probe.get('cv_pr_auc')}</div>
-<div class=badge>Lift={probe.get('lift')}</div>
-<div class=badge>Shuffle p={probe.get('shuffle_p')}</div>
-<p><b>{interp}</b></p>
-<h2>Top 40 Features</h2>
-<table><tr><th>Feature</th><th>AUC</th><th>MI</th><th>Q</th><th>Verdict</th></tr>{rows_html}</table>
-<h2>Selected</h2><pre>{json.dumps(selected, ensure_ascii=False, indent=2)}</pre>
-</body></html>""")
-
-    # chart
-    fig_path = os.path.join(DATA_DIR, "HIPO_FeatureQuality_Top.png")
-    try:
-        fig, ax = plt.subplots(figsize=(10, 5), facecolor="#0b0f19")
-        ax.set_facecolor("#0b0f19")
-        top = feat_df.head(15)
-        ax.barh(top["feature"][::-1], top["quality_0_100"][::-1], color="#00f2ff")
-        ax.tick_params(colors="white")
-        ax.axvline(35, color="#ffaa00", ls="--", alpha=0.7)
-        ax.axvline(55, color="#00ff88", ls="--", alpha=0.7)
-        ax.set_title("Top Feature Quality vs Label", color="#00ff88", fontweight="bold")
-        for sp in ax.spines.values():
-            sp.set_color("#333")
-        plt.tight_layout()
-        fig.savefig(fig_path, dpi=120)
-        plt.close(fig)
-    except Exception:
-        plt.close("all")
-        fig_path = None
-
-    msg = (
-        f"### 🔬 گزارش کیفیت فیچر ↔ لیبل\\n\\n"
-        f"**Global Score: `{gscore}/100`**\\n\\n"
-        f"- نمونه‌ها: **{n}** | برد: **{wins}** | باخت: **{losses}** | "
-        f"{'✅ Wins>Losses' if wins > losses else '❌ Wins≤Losses'}\\n"
-        f"- WinRate: **{wr*100:.1f}%** | Selected: **{len(selected)}** "
-        f"(KEEP_STRONG={strong})\\n"
-        f"- CV PR-AUC: **{probe.get('cv_pr_auc')}** | Lift: **{probe.get('lift')}×** | "
-        f"Shuffle p: **{probe.get('shuffle_p')}** "
-        f"→ {'✅ REAL' if probe.get('real') else '⚠️ weak/noise'}\\n\\n"
-        f"**تفسیر:** {interp}\\n\\n"
-        f"📁 `selected_features.json` و گزارش HTML ذخیره شد."
-    )
-    progress(1.0, desc="Done")
-    return msg, feat_df.head(40), fig_path, html_path, sel_path
-
-
-def get_labeled_datasets_for_quality():
-    files = glob.glob(os.path.join(DATA_DIR, "*_Labeled.parquet"))
-    names = sorted({os.path.basename(f).replace("_Labeled.parquet", "") for f in files})
-    return names if names else ["No Data Found"]
-
-
 # =============================================================================
 # 9. رابط کاربری (Gradio UI - Pivot Settlement Edition)
 # =============================================================================
-
-with gr.Blocks(title="HIPO LABELING FORGE v5 COMPLETE") as web_app:
+with gr.Blocks(title="HIPO LABELING FORGE (PIVOT SETTLEMENT ENGINE)") as web_app:
     gr.HTML("""
-        <div style="text-align:center;border-bottom:1px solid #333;padding-bottom:16px;margin-bottom:16px">
-            <h1 style="color:#00f2ff;font-family:monospace;font-size:28px;margin:0">
-                🧭 HIPO PIVOT SETTLEMENT FORGE v5.0 COMPLETE
-            </h1>
-            <p style="color:#00ff88;font-family:monospace;margin-top:8px">
-                Manual Labeling · GA (Wins&gt;Losses + FeatureQuality) · Feature↔Label Quality Report
-            </p>
+        <div style="text-align: center; border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 20px;">
+            <h1 style="color: #00f2ff; font-family: monospace; font-size: 32px; margin-bottom: 5px;">🧭 HIPO PIVOT SETTLEMENT FORGE (v4 MULTI-OBJ)</h1>
+            <p style="color: #ff0055; font-family: monospace;">AB Impulse → BC Retrace (20-50%) → Liquidity Box → Signal Sweep → Trigger Break | 100% Zero-Lookahead</p>
         </div>
     """)
 
     with gr.Tabs():
-        # ===================== TAB 1 MANUAL =====================
-        with gr.Tab("🎯 استخراج دستی"):
+        with gr.Tab("🎯 استخراج دستی (Manual Extraction)"):
             with gr.Row():
                 with gr.Column():
-                    gr.Markdown("### ⚙️ موج AB / BC")
-                    w_data = gr.CheckboxGroup(
-                        choices=get_available_datasets(),
-                        label="دیتاست‌های Features",
-                        value=[get_available_datasets()[0]] if get_available_datasets() else [],
+                    gr.Markdown("### ⚙️ ساختار موج AB / BC")
+                    w_data = gr.CheckboxGroup(choices=get_available_datasets(), label="1️⃣ انتخاب دیتاست‌ها", value=[get_available_datasets()[0]] if get_available_datasets() else [])
+                    w_swing_n = gr.Slider(minimum=1, maximum=10, step=1, label="حساسیت فرکتال پیوت (Swing N)", value=2)
+                    w_ab_min_bars = gr.Slider(minimum=2, maximum=10, step=1, label="حداقل تعداد کندل موج AB", value=2)
+                    w_ab_max_bars = gr.Slider(minimum=3, maximum=20, step=1, label="حداکثر تعداد کندل موج AB", value=8,
+                                               info="🔧 پیش‌فرض از ۶ به ۸ افزایش یافت — طبق قیف تشخیصی، این Gate به‌تنهایی ۲۹٪ از کل کاندیدها رو حذف می‌کرد.")
+                    w_ab_atr_mult = gr.Slider(minimum=0.5, maximum=5.0, step=0.1, label="حداقل شارپ‌بودن AB (رنج AB / ATR)", value=1.5)
+                    w_ab_ext_min = gr.Slider(minimum=1.0, maximum=6.0, step=0.1, label="حد پایین AB بلندتر از ۳ کندل (٪ATR)", value=2.0, info="طبق PDF: بین ۲۰۰٪ تا ۵۰۰٪ ATR")
+                    w_ab_ext_max = gr.Slider(minimum=2.0, maximum=10.0, step=0.1, label="حد بالای AB بلندتر از ۳ کندل (٪ATR)", value=5.0)
+                    w_ab_noise_fraction = gr.Slider(minimum=0.1, maximum=0.6, step=0.02,
+                                                     label="🔧 حداکثر نسبت کندل‌های نویز در موج AB (مقیاس‌پذیر با طول موج)",
+                                                     value=0.34,
+                                                     info="قبلاً برای هر طولی سقفِ ثابتِ ۱ کندل نویز بود (۲۴.۸٪ ریزش). الان: max(1, bars_AB × این‌عدد)")
+                    w_ab2_discount = gr.Slider(minimum=0.3, maximum=1.0, step=0.05,
+                                                label="🔧 ضریب تخفیف ATR برای موج AB دوکندلی",
+                                                value=0.8,
+                                                info="قبلاً hardcoded=0.8 بود (مسئول ۱۸.۲٪ ریزش). عدد کمتر یعنی سخت‌گیری کمتر.")
+                    gr.Markdown(
+                        "⚠️ **توجه:** خودِ PDF در مورد رابطه‌ی اندازه‌ی AB و CD دو عبارتِ متناقض دارد "
+                        "(خط اول: AB>CD؛ دو جای دیگر با نماد صریح: CD>AB). هر دو خوانش را می‌توانید تست کنید:"
                     )
-                    w_swing_n = gr.Slider(1, 10, value=1, step=1, label="Swing N (پیشنهاد تست‌شده: 1)")
-                    w_ab_min_bars = gr.Slider(2, 10, value=2, step=1, label="حداقل کندل AB")
-                    w_ab_max_bars = gr.Slider(3, 20, value=12, step=1, label="حداکثر کندل AB")
-                    w_ab_atr_mult = gr.Slider(0.5, 5.0, value=1.1, step=0.1, label="حداقل AB/ATR")
-                    w_ab_ext_min = gr.Slider(1.0, 6.0, value=1.5, step=0.1, label="حد پایین AB بلند (ATR)")
-                    w_ab_ext_max = gr.Slider(2.0, 10.0, value=6.0, step=0.1, label="حد بالای AB بلند (ATR)")
-                    w_ab_noise_fraction = gr.Slider(0.1, 0.6, value=0.50, step=0.02, label="نسبت نویز مجاز AB")
-                    w_ab2_discount = gr.Slider(0.3, 1.0, value=0.7, step=0.05, label="تخفیف ATR برای AB دوکندلی")
                     w_cd_ab_mode = gr.Dropdown(
                         choices=["CD > AB (طبق نقاط تکرارشده در PDF)", "AB > CD (طبق خط اول PDF)"],
                         value="CD > AB (طبق نقاط تکرارشده در PDF)",
-                        label="قانون AB/CD",
+                        label="قانون واگرایی قیمتی اجباری بین AB و CD"
                     )
+
                 with gr.Column():
-                    gr.Markdown("### 🧲 BC / باکس / سیگنال")
-                    w_bc_min_bars = gr.Slider(1, 15, value=2, step=1, label="حداقل کندل BC")
-                    w_bc_retrace_min = gr.Slider(0.05, 0.6, value=0.15, step=0.01, label="حداقل اصلاح BC")
-                    w_bc_retrace_max = gr.Slider(0.2, 0.8, value=0.65, step=0.01, label="حداکثر اصلاح BC")
-                    w_box_scale = gr.Slider(0.5, 2.0, value=1.0, step=0.05, label="ضریب باکس نقدینگی")
-                    w_signal_search_bars = gr.Slider(5, 150, value=100, step=5, label="مهلت جستجوی سیگنال")
-                    w_signal_atr_mult = gr.Slider(0.1, 2.0, value=0.4, step=0.05, label="رنج سیگنال/ATR")
-                    w_signal_body_ratio = gr.Slider(0.0, 1.0, value=0.3, step=0.05, label="نسبت بدنه سیگنال")
-                    w_signal_wick_reject = gr.Slider(0.3, 3.0, value=1.5, step=0.05, label="حداکثر شدوی مخالف")
-                    w_allow_fl = gr.Checkbox(value=True, label="فعال‌سازی FL candle")
-                    w_confirm_search_bars = gr.Slider(1, 50, value=20, step=1, label="مهلت کندل تایید")
-                    w_confirm_atr_mult = gr.Slider(0.1, 2.0, value=0.3, step=0.05, label="رنج تایید/ATR")
+                    gr.Markdown("### 🧲 اصلاح BC و باکس نقدینگی")
+                    w_bc_min_bars = gr.Slider(minimum=1, maximum=15, step=1, label="حداقل تعداد کندل موج BC", value=3)
+                    w_bc_retrace_min = gr.Slider(minimum=0.05, maximum=0.6, step=0.01, label="حداقل نسبت اصلاح BC از AB", value=0.20)
+                    w_bc_retrace_max = gr.Slider(minimum=0.2, maximum=0.8, step=0.01, label="حداکثر نسبت اصلاح BC از AB (کلوز بدنه)", value=0.50)
+                    w_box_scale = gr.Slider(minimum=0.5, maximum=2.0, step=0.05, label="ضریب اندازه‌ی باکس نقدینگی (نسبت به AB)", value=1.0)
+
+                    gr.Markdown("### 🎯 کندل سیگنال و کندل تایید")
+                    w_signal_search_bars = gr.Slider(minimum=5, maximum=150, step=5, label="حداکثر کندل جست‌وجوی کندل سیگنال (پس از شروع BC)", value=40)
+                    w_signal_atr_mult = gr.Slider(minimum=0.1, maximum=2.0, step=0.05, label="حداقل رنج کندل سیگنال / ATR", value=0.5)
+                    w_signal_body_ratio = gr.Slider(minimum=0.0, maximum=1.0, step=0.05, label="حداقل نسبت بدنه به رنج کندل سیگنال", value=0.4)
+                    w_signal_wick_reject = gr.Slider(minimum=0.3, maximum=3.0, step=0.05, label="حداکثر نسبت شدوی مخالف به بدنه (رد کندل سیگنال)", value=1.2)
+                    w_allow_fl = gr.Checkbox(value=True, label="✅ فعال‌سازی ترکیب کندل FL (۲ یا ۳ کندلی) در صورت رد شدن کندل منفرد")
+                    w_confirm_search_bars = gr.Slider(minimum=1, maximum=50, step=1, label="حداکثر کندل جست‌وجوی کندل تایید (پس از کندل سیگنال)", value=15)
+                    w_confirm_atr_mult = gr.Slider(minimum=0.1, maximum=2.0, step=0.05, label="حداقل رنج کندل تایید / ATR", value=0.4)
+
                 with gr.Column():
-                    gr.Markdown("### 🏁 ریسک و داوری")
-                    w_sl_buffer = gr.Slider(0.0, 2.0, value=0.1, step=0.05, label="بافر SL (ATR)")
-                    w_rr = gr.Slider(1.0, 6.0, value=1.0, step=0.1, label="R:R (برای Wins>Losses: 1.0–1.5)")
-                    w_spread = gr.Number(value=0.00012, label="اسپرد (EUR≈0.00012 | XAU=0.35)")
-                    w_max_bars = gr.Slider(10, 300, value=60, step=5, label="Max Bars")
-                    w_trend_gate = gr.Checkbox(value=False, label="فیلتر روند EMA_Stack")
+                    gr.Markdown("### 🏁 مدیریت ریسک و داوری معامله")
+                    w_sl_buffer = gr.Slider(minimum=0.0, maximum=2.0, step=0.05, label="بافر اضافه‌ی استاپ‌لاس (ضریب ATR)", value=0.1)
+                    w_rr = gr.Slider(minimum=1.0, maximum=6.0, step=0.1, label="تارگت (R:R)", value=2.5, info="طبق PDF معمولاً ۲.۵ تا ۳ یا بیشتر")
+                    w_spread = gr.Slider(minimum=0.0, maximum=0.001, step=0.0001, label="اسپرد خام نماد", value=0.0002)
+                    w_max_bars = gr.Slider(minimum=10, maximum=300, step=5, label="حداکثر مهلت زمانی پوزیشن (Max Bars)", value=60)
+
+                    gr.Markdown("### 🧭 فیلتر اختیاری هم‌جهتی با روند بلندمدت")
+                    w_trend_gate = gr.Checkbox(value=False, label="فعال‌سازی فیلتر هم‌جهتی با روند بلندمدت (EMA_Stack_Score)")
                     w_trend_gate_mode = gr.Dropdown(
                         choices=["خلاف روند (Counter-Trend Reversal)", "هم‌جهت روند (With-Trend Continuation)"],
                         value="خلاف روند (Counter-Trend Reversal)",
-                        label="حالت فیلتر روند",
+                        label="حالت فیلتر روند (طبق تجربه‌ی قبلی پروژه، نرخ برد را بالا می‌برد ولی تعداد نمونه را کم می‌کند)"
                     )
+
             w_btn = gr.Button("🔥 EXTRACT PIVOT SETTLEMENT SIGNALS", variant="primary", size="lg")
+
             with gr.Row():
                 with gr.Column(scale=2):
-                    w_msg = gr.Textbox(label="وضعیت", lines=6)
-                    w_tail = gr.DataFrame(label="نمونه سیگنال‌ها")
+                    w_msg = gr.Textbox(label="📡 وضعیت نهایی استخراج", lines=6)
+                    w_tail = gr.DataFrame(label="📊 نمایش ردیف‌های دارای سیگنال (فشرده‌شده و خالص)")
                 with gr.Column(scale=1):
-                    w_stats = gr.DataFrame(label="توزیع Win/Loss")
-                    w_zip = gr.File(label="تصاویر ZIP")
-            w_funnel = gr.DataFrame(label="قیف رد سیگنال")
+                    w_stats = gr.DataFrame(label="📈 توزیع پیروزی و شکست استراتژی")
+                    w_zip = gr.File(label="📦 دانلود تصاویر سیگنال‌ها")
+
+            gr.Markdown("### 🔬 قیف تشخیصی رد سیگنال (Diagnostic Rejection Funnel)")
+            gr.Markdown(
+                "هر ردیف یعنی چند تا کاندیدِ AB دقیقاً سرِ همین شرط حذف شده‌اند. "
+                "به‌جای حدس زدن، از همین جدول ببینید کدوم Gate بیشترین ریزش رو داره و "
+                "فقط همون پارامتر رو (با آگاهی، نه شانسی) شل کنید."
+            )
+            w_funnel = gr.DataFrame(label="📉 آمار ریزش در هر مرحله (Rejection Funnel)")
+
             w_btn.click(
                 process_labeling_pivot_settlement,
                 inputs=[w_data, w_swing_n, w_ab_min_bars, w_ab_max_bars, w_ab_atr_mult, w_ab_ext_min, w_ab_ext_max,
@@ -1795,105 +1416,84 @@ with gr.Blocks(title="HIPO LABELING FORGE v5 COMPLETE") as web_app:
                         w_confirm_search_bars, w_confirm_atr_mult, w_sl_buffer, w_cd_ab_mode,
                         w_rr, w_spread, w_max_bars, w_trend_gate, w_trend_gate_mode,
                         w_ab_noise_fraction, w_ab2_discount],
-                outputs=[w_msg, w_tail, w_stats, w_zip, w_funnel],
+                outputs=[w_msg, w_tail, w_stats, w_zip, w_funnel]
             )
 
-        # ===================== TAB 2 GA =====================
-        with gr.Tab("🧬 اپتیمایز ژنتیک (Wins>Losses + FeatureQuality)"):
+        with gr.Tab("🧬 اپتیمایزیشن ژنتیک چندهدفه v4 (Sample+WR+FeatureQuality)"):
             gr.Markdown(
-                """
-### هدف GA v5
-1. **Wins_Class1 > Losses_Class0** (قید اصلی — بردها بیشتر از باخت‌ها)
-2. **Feature_Quality** بالا (فیچرها Win/Loss را جدا کنند)
-3. **تعداد نمونه** کافی (min_samples)
-
-منطق کشف سیگنال عوض نمی‌شود؛ فقط پارامترها تکامل می‌یابند.
-                """
+                "### 🎯 جست‌وجوی ژنتیک برای بهترین ترکیب پارامترها\n"
+                "این بخش **منطق کشف سیگنال را عوض نمی‌کند** — با یک الگوریتم ژنتیک واقعی "
+                "(جمعیت → انتخاب → کراس‌آور → جهش → نسل بعد، دقیقاً مثل موتور Optimizer متاتریدر) "
+                "پارامترهای سربرگ «استخراج دستی» را نسل‌به‌نسل تکامل می‌دهد تا هم **تعداد** و هم "
+                "**درصد معاملاتِ برنده (کلاس ۱)** بالا برود — نه صرفاً نزدیکی به ۵۰/۵۰."
             )
             with gr.Row():
                 w_opt_data = gr.CheckboxGroup(
-                    choices=get_available_datasets(),
-                    label="دیتاست‌ها",
-                    value=[get_available_datasets()[0]] if get_available_datasets() else [],
+                    choices=get_available_datasets(), label="1️⃣ دیتاست‌ها",
+                    value=[get_available_datasets()[0]] if get_available_datasets() else []
                 )
                 w_opt_min_samples = gr.Slider(
-                    30, 5000, value=80, step=10,
-                    label="حداقل نمونه (قید سخت)",
-                    info="روی 2 سال M15 معمولاً 80–300 واقع‌بینانه است",
+                    minimum=200, maximum=10000, step=100, value=100,
+                    label="حداقل تعداد نمونه‌ی قابل‌قبول (قید سخت)",
+                    info="طبق تجربه‌ی پروژه، حداقل ۱۰۰۰ تا ۵۰۰۰ نمونه لازم است؛ کمتر از این یعنی نتیجه به‌احتمال زیاد تصادفی/اورفیت‌شده است."
                 )
             with gr.Row():
-                w_opt_population = gr.Slider(8, 80, value=20, step=2, label="جمعیت")
-                w_opt_generations = gr.Slider(3, 40, value=12, step=1, label="نسل‌ها")
-                w_opt_elite = gr.Slider(0.05, 0.5, value=0.2, step=0.05, label="Elitism")
+                w_opt_population = gr.Slider(minimum=8, maximum=100, step=2, value=24,
+                                              label="اندازه‌ی جمعیت (Population Size)")
+                w_opt_generations = gr.Slider(minimum=3, maximum=60, step=1, value=16,
+                                               label="تعداد نسل‌ها (Generations)",
+                                               info="کل ارزیابی‌ها = جمعیت × نسل‌ها. عدد بیشتر = دقیق‌تر ولی زمان‌بر‌تر.")
+                w_opt_elite = gr.Slider(minimum=0.05, maximum=0.5, step=0.05, value=0.2,
+                                         label="نسبت نخبگان (Elitism %)",
+                                         info="این درصد از بهترین افراد هر نسل، بدون تغییر به نسل بعد منتقل می‌شوند.")
             with gr.Row():
-                w_opt_mutation = gr.Slider(0.05, 0.6, value=0.25, step=0.05, label="Mutation")
-                w_opt_immigrant = gr.Slider(0.0, 0.4, value=0.20, step=0.05, label="Immigrants (تنوع)")
-                w_opt_spread = gr.Number(value=0.00012, label="اسپرد")
-                w_opt_seed = gr.Number(value=42, label="Seed")
+                w_opt_mutation = gr.Slider(minimum=0.05, maximum=0.6, step=0.05, value=0.25,
+                                            label="نرخ جهش (Mutation Rate)")
+                w_opt_immigrant = gr.Slider(minimum=0.0, maximum=0.4, step=0.05, value=0.15,
+                                             label="نسبت مهاجرِ تصادفی (Random Immigrants %)",
+                                             info="جلوگیری از گیرکردن در یک بهینه‌ی محلی، با تزریق چند فردِ کاملاً تصادفی در هر نسل.")
+                w_opt_spread = gr.Number(value=0.00012, label="اسپرد (EUR≈0.00012 | XAU≈0.35)")
+                w_opt_seed = gr.Number(value=42, label="Seed تصادفی (برای تکرارپذیری)")
 
-            w_opt_btn = gr.Button("🚀 شروع GA v5 (Wins>Losses + FQ)", variant="primary", size="lg")
-            w_opt_summary = gr.Markdown()
+            w_opt_btn = gr.Button("🚀 شروع اپتیمایزیشن ژنتیک", variant="primary", size="lg")
+            w_opt_summary = gr.Textbox(label="📡 خلاصه‌ی نتیجه", lines=8)
+
             with gr.Row():
-                w_opt_convergence = gr.Image(label="همگرایی", type="filepath")
-                w_opt_history = gr.DataFrame(label="تاریخچه نسل")
-            w_opt_table = gr.DataFrame(label="۳۰ فرد برتر")
-            w_opt_report = gr.File(label="گزارش JSON")
+                w_opt_convergence = gr.Image(label="📈 نمودار همگرایی نسل‌به‌نسل (Best / Avg Fitness)", type="filepath")
+                w_opt_history = gr.DataFrame(label="🧬 خلاصه‌ی هر نسل")
+
+            w_opt_table = gr.DataFrame(label="🏆 ۳۰ فردِ برتر در کل جمعیت‌ها (مرتب‌شده بر اساس فیتنس: بردها × درصد وین‌ریت)")
+            w_opt_report = gr.File(label="📥 گزارش کامل اپتیمایزیشن ژنتیک (JSON — بهترین تنظیمات + تاریخچه‌ی کامل نسل‌ها)")
             state_best_config = gr.State(None)
 
             w_opt_btn.click(
                 run_pivot_optimization_ga,
                 inputs=[w_opt_data, w_opt_min_samples, w_opt_population, w_opt_generations,
                         w_opt_elite, w_opt_mutation, w_opt_immigrant, w_opt_spread, w_opt_seed],
-                outputs=[w_opt_summary, w_opt_table, w_opt_history, w_opt_convergence, state_best_config, w_opt_report],
+                outputs=[w_opt_summary, w_opt_table, w_opt_history, w_opt_convergence, state_best_config, w_opt_report]
             )
 
-            gr.Markdown("### اعمال بهترین تنظیمات → ساخت Labeled parquet")
-            w_opt_apply_btn = gr.Button("📦 Apply Best Config & Build Labels", variant="primary")
+            gr.Markdown("---")
+            gr.Markdown(
+                "### ✅ مرحله‌ی دوم: اجرای کامل با بهترین تنظیمات یافت‌شده\n"
+                "بعد از پایان جست‌وجوی بالا، دکمه‌ی زیر را بزنید تا *همان* موتور اصلی سلول "
+                "(بدون هیچ تغییری) با بهترین فردِ پیدا‌شده اجرا شود و پارکت لیبل‌شده، تصاویر، "
+                "آمار و قیف تشخیصی — دقیقاً مثل حالت دستی — تولید شوند."
+            )
+            w_opt_apply_btn = gr.Button("📦 اعمال بهترین تنظیمات و تولید خروجی نهایی", variant="primary", size="lg")
             with gr.Row():
                 with gr.Column(scale=2):
-                    w_opt_final_msg = gr.Textbox(label="وضعیت", lines=6)
-                    w_opt_final_tail = gr.DataFrame(label="سیگنال‌ها")
+                    w_opt_final_msg = gr.Textbox(label="📡 وضعیت نهایی استخراج", lines=6)
+                    w_opt_final_tail = gr.DataFrame(label="📊 نمایش ردیف‌های دارای سیگنال")
                 with gr.Column(scale=1):
-                    w_opt_final_stats = gr.DataFrame(label="Win/Loss")
-                    w_opt_final_zip = gr.File(label="ZIP تصاویر")
-            w_opt_final_funnel = gr.DataFrame(label="قیف")
+                    w_opt_final_stats = gr.DataFrame(label="📈 توزیع پیروزی و شکست")
+                    w_opt_final_zip = gr.File(label="📦 دانلود تصاویر سیگنال‌ها")
+            w_opt_final_funnel = gr.DataFrame(label="📉 قیف تشخیصی رد سیگنال (Rejection Funnel)")
+
             w_opt_apply_btn.click(
                 apply_best_optimization_config,
                 inputs=[state_best_config, w_opt_data],
-                outputs=[w_opt_final_msg, w_opt_final_tail, w_opt_final_stats, w_opt_final_zip, w_opt_final_funnel],
-            )
-
-        # ===================== TAB 3 QUALITY =====================
-        with gr.Tab("🔬 گزارش کیفیت فیچر ↔ لیبل"):
-            gr.Markdown(
-                """
-### بعد از ساخت Labeled این تب را اجرا کنید
-- رتبه‌بندی هر فیچر (AUC / MI / Quality)
-- Global Score + Label-Shuffle
-- ذخیره `selected_features.json` برای Training
-- بررسی **Wins > Losses**
-                """
-            )
-            with gr.Row():
-                w_q_data = gr.CheckboxGroup(
-                    choices=get_labeled_datasets_for_quality(),
-                    label="دیتاست‌های Labeled",
-                    value=[get_labeled_datasets_for_quality()[0]] if get_labeled_datasets_for_quality() else [],
-                )
-                w_q_max = gr.Slider(10, 80, value=35, step=1, label="حداکثر فیچر منتخب")
-                w_q_min = gr.Slider(10, 60, value=25, step=1, label="حداقل Quality برای KEEP")
-            w_q_btn = gr.Button("🚀 RUN FEATURE↔LABEL QUALITY REPORT", variant="primary", size="lg")
-            w_q_msg = gr.Markdown()
-            with gr.Row():
-                w_q_table = gr.DataFrame(label="رتبه‌بندی فیچرها")
-                w_q_fig = gr.Image(label="نمودار کیفیت", type="filepath")
-            with gr.Row():
-                w_q_html = gr.File(label="HTML Report")
-                w_q_json = gr.File(label="selected_features.json")
-            w_q_btn.click(
-                run_feature_label_quality_report,
-                inputs=[w_q_data, w_q_max, w_q_min],
-                outputs=[w_q_msg, w_q_table, w_q_fig, w_q_html, w_q_json],
+                outputs=[w_opt_final_msg, w_opt_final_tail, w_opt_final_stats, w_opt_final_zip, w_opt_final_funnel]
             )
 
 web_app.queue().launch(share=True, inbrowser=True)

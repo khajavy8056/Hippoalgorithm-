@@ -1,17 +1,13 @@
-# @title 🧠 HIPO STRUCTURE ENGINE [v25.0 COMPLETE — Zero-Leak + PSA/LSW/FVG] { display-mode: "form" }
+# @title 🧠 HIPO STRUCTURE ENGINE [v25.0 PIVOT-ALIGNED + PSA/LSW/FVG] { display-mode: "form" }
 # =============================================================================
-# سلول کامل فیچر — آماده Colab
-# ورودی : /content/hipo_lab_data/*_Tick*.parquet
-# خروجی : /content/hipo_lab_data/{PAIR}_Features.parquet
-#
-# شامل:
-#  - تمام build_* با shift(1) ضد نشت
-#  - Killzone لندن/نیویورک/آسیا
-#  - Warmup 250 + dropna (بدون fillna(0))
-#  - PSA_*  : هم‌راستا با منطق Pivot Settlement (AB/BC/Sweep/Box)
-#  - LSW_*  : Liquidity Sweep + Tick align
-#  - FVG_*  : Fair Value Gap
-#  - MTF Structure ضد نشت
+# تغییرات کلیدی نسبت به v23:
+# 1. همه build_* ها در انتها .shift(1) می‌شوند → ورود در open کندل بعد، بدون دیدن close همان کندل
+# 2. build_liquidity_features که قبلا بدون shift بود الان FIXED شد
+# 3. build_time_features + Killzone لندن/نیویورک/آسیا اضافه شد + shift
+# 4. build_structure_features در انتها shift(1) → BOS/CHoCH دیگر از close همان کندل entry استفاده نمی‌کند
+# 5. پس از concat تمام بلوک‌ها، 250 کندل اول (warmup بزرگترین پنجره 200) + تمام NaN ها drop می‌شوند
+#    به‌جای fillna(0) که آلودگی می‌ساخت
+# 6. گزارش NaN fraction قبل از ذخیره
 # =============================================================================
 
 import sys, subprocess
@@ -505,7 +501,7 @@ def process_data_batch(pairs, tf, micro_n, macro_n, feature_groups, progress=gr.
     tf_map = {'M1': '1min', 'M5': '5min', 'M15': '15min', 'M30': '30min', 'H1': '1h', 'H4': '4h', 'D1': '1D'}
     resample_rule = tf_map.get(tf, '15min')
     total_pairs = len(pairs)
-    final_message = f"🚀 عملیات روی {total_pairs} نماد آغاز شد (Structure Engine v25 PIVOT-ALIGNED)...\n"
+    final_message = f"🚀 عملیات روی {total_pairs} نماد آغاز شد (Structure Engine v24 FIXED - Zero Leak)...\n"
     last_tail_df = pd.DataFrame()
     yield final_message, last_tail_df
 
@@ -624,10 +620,10 @@ def process_data_batch(pairs, tf, micro_n, macro_n, feature_groups, progress=gr.
         final_message += f"✅ {pair} تکمیل شد | ردیف‌ها: {len(df_final)} | ستون‌ها: {len(df_final.columns)}\n"
         last_tail_df = df_final.tail(50).reset_index()
         yield final_message, last_tail_df
-        del df, df_final, struct_micro, struct_macro, vol_feats, liq_feats, time_feats, trend_feats, fractal_feats, longterm_feats, fib_feats, sr_feats, ob_feats, profile_feats, pivot_wave_feats, psa_feats, lsw_feats, fvg_feats, mtf_blocks
+        del df, df_final, struct_micro, struct_macro, vol_feats, liq_feats, time_feats, trend_feats, fractal_feats, longterm_feats, fib_feats, sr_feats, ob_feats, profile_feats, pivot_wave_feats, mtf_blocks
         gc.collect()
 
-    final_message += "\n🏁 پایان عملیات Structure Engine v25 PIVOT-ALIGNED (PSA/LSW/FVG)."
+    final_message += "\n🏁 پایان عملیات Structure Engine FIXED."
     yield final_message, last_tail_df
 
 with gr.Blocks(title="HIPO STRUCTURE ENGINE v25 PIVOT-ALIGNED") as web_app:

@@ -1,13 +1,17 @@
-# @title 🧠 HIPO STRUCTURE ENGINE [v24.0 FIXED - Zero Leak + Killzone + Warmup Drop] { display-mode: "form" }
+# @title 🧠 HIPO STRUCTURE ENGINE [v25.0 COMPLETE — Zero-Leak + PSA/LSW/FVG] { display-mode: "form" }
 # =============================================================================
-# تغییرات کلیدی نسبت به v23:
-# 1. همه build_* ها در انتها .shift(1) می‌شوند → ورود در open کندل بعد، بدون دیدن close همان کندل
-# 2. build_liquidity_features که قبلا بدون shift بود الان FIXED شد
-# 3. build_time_features + Killzone لندن/نیویورک/آسیا اضافه شد + shift
-# 4. build_structure_features در انتها shift(1) → BOS/CHoCH دیگر از close همان کندل entry استفاده نمی‌کند
-# 5. پس از concat تمام بلوک‌ها، 250 کندل اول (warmup بزرگترین پنجره 200) + تمام NaN ها drop می‌شوند
-#    به‌جای fillna(0) که آلودگی می‌ساخت
-# 6. گزارش NaN fraction قبل از ذخیره
+# سلول کامل فیچر — آماده Colab
+# ورودی : /content/hipo_lab_data/*_Tick*.parquet
+# خروجی : /content/hipo_lab_data/{PAIR}_Features.parquet
+#
+# شامل:
+#  - تمام build_* با shift(1) ضد نشت
+#  - Killzone لندن/نیویورک/آسیا
+#  - Warmup 250 + dropna (بدون fillna(0))
+#  - PSA_*  : هم‌راستا با منطق Pivot Settlement (AB/BC/Sweep/Box)
+#  - LSW_*  : Liquidity Sweep + Tick align
+#  - FVG_*  : Fair Value Gap
+#  - MTF Structure ضد نشت
 # =============================================================================
 
 import sys, subprocess
@@ -418,6 +422,82 @@ def build_mtf_alignment_features(micro_struct, htf_struct_list, tags):
         out['MTF_Alignment_Score'] = 0.0
     return out.shift(1)
 
+
+
+def build_pivot_settlement_aligned_features(df, n=2):
+    """PSA_*: features aligned with Pivot Settlement AB/BC/Sweep/Box logic. Causal + shift(1)."""
+    out = pd.DataFrame(index=df.index)
+    idx_pos = pd.Series(np.arange(len(df)), index=df.index)
+    is_fh, is_fl, fh_price, fl_price = detect_causal_fractals(df, n=n)
+    atr = calc_atr(df, 14)
+    last_h = fh_price.ffill(); last_l = fl_price.ffill()
+    last_h_idx = idx_pos.where(is_fh).ffill(); last_l_idx = idx_pos.where(is_fl).ffill()
+    last_is_high = (last_h_idx.fillna(-1) > last_l_idx.fillna(-1))
+    B_price = pd.Series(np.where(last_is_high, last_h, last_l), index=df.index)
+    B_idx = pd.Series(np.where(last_is_high, last_h_idx, last_l_idx), index=df.index)
+    A_price = pd.Series(np.where(last_is_high, last_l, last_h), index=df.index)
+    A_idx = pd.Series(np.where(last_is_high, last_l_idx, last_h_idx), index=df.index)
+    ab_range = (B_price - A_price).abs().replace(0, np.nan)
+    ab_bars = (B_idx - A_idx).replace(0, np.nan)
+    ab_dir = pd.Series(np.where(last_is_high, 1.0, -1.0), index=df.index)
+    change_pt = (B_idx != B_idx.shift(1)).cumsum()
+    seg_low = df['Low'].groupby(change_pt).cummin(); seg_high = df['High'].groupby(change_pt).cummax()
+    bc_extreme = pd.Series(np.where(last_is_high, (B_price - seg_low)/ab_range, (seg_high - B_price)/ab_range), index=df.index)
+    bc_retrace = ((B_price - df['Close'])/ab_range)*ab_dir
+    dist_to_B = ((df['Close'] - B_price)/(atr+1e-9))*ab_dir
+    sweep_wick = pd.Series(np.where(last_is_high, df['High']>B_price, df['Low']<B_price), index=df.index).astype(int)
+    sweep_close = pd.Series(np.where(last_is_high, df['Close']>B_price, df['Close']<B_price), index=df.index).astype(int)
+    sweep_depth = pd.Series(np.where(last_is_high, (df['High']-B_price).clip(lower=0)/(atr+1e-9), (B_price-df['Low']).clip(lower=0)/(atr+1e-9)), index=df.index)
+    C_proxy = pd.Series(np.where(last_is_high, seg_low, seg_high), index=df.index)
+    pos_in_box = pd.Series(np.where(last_is_high, (df['Close']-C_proxy)/(ab_range+1e-9), (C_proxy-df['Close'])/(ab_range+1e-9)), index=df.index)
+    cd_range = pd.Series(np.where(last_is_high, (seg_high-C_proxy).clip(lower=0), (C_proxy-seg_low).clip(lower=0)), index=df.index)
+    rng = df['High']-df['Low']; body=(df['Close']-df['Open']).abs()
+    upper_wick = df['High']-df[['Open','Close']].max(axis=1)
+    lower_wick = df[['Open','Close']].min(axis=1)-df['Low']
+    opp_wick = pd.Series(np.where(last_is_high, upper_wick/(body+1e-9), lower_wick/(body+1e-9)), index=df.index)
+    out['PSA_AB_Range_ATR']=ab_range/(atr+1e-9); out['PSA_AB_Bars']=ab_bars; out['PSA_AB_Dir']=ab_dir
+    out['PSA_Bars_Since_B']=(idx_pos-B_idx); out['PSA_BC_Retrace_Close']=bc_retrace; out['PSA_BC_Retrace_Extreme']=bc_extreme
+    out['PSA_BC_In_SweetZone']=((bc_extreme>=0.20)&(bc_extreme<=0.65)).astype(float)
+    out['PSA_Dist_To_B_ATR']=dist_to_B; out['PSA_Sweep_Wick_Flag']=sweep_wick; out['PSA_Sweep_Close_Flag']=sweep_close
+    out['PSA_Sweep_Depth_ATR']=sweep_depth; out['PSA_Box_Position']=pos_in_box.clip(-0.5,1.5)
+    out['PSA_Close_Beyond_Box']=(pos_in_box>1.0).astype(float); out['PSA_CD_AB_Ratio']=cd_range/(ab_range+1e-9)
+    out['PSA_Candle_Range_ATR']=rng/(atr+1e-9); out['PSA_Candle_Body_Ratio']=body/rng.replace(0,np.nan)
+    out['PSA_Opp_Wick_Body_Ratio']=opp_wick
+    out['PSA_Setup_Readiness']=out['PSA_BC_In_SweetZone']*(1.0/(1.0+out['PSA_Dist_To_B_ATR'].abs()))*(out['PSA_AB_Range_ATR'].clip(0,5)/5.0)
+    return out.shift(1)
+
+def build_liquidity_sweep_features(df, lookback=20):
+    out=pd.DataFrame(index=df.index); atr=calc_atr(df,14)
+    prev_high=df['High'].shift(1).rolling(lookback).max(); prev_low=df['Low'].shift(1).rolling(lookback).min()
+    bull=(df['Low']<prev_low)&(df['Close']>prev_low); bear=(df['High']>prev_high)&(df['Close']<prev_high)
+    out['LSW_Bull_Sweep_Flag']=bull.astype(int); out['LSW_Bear_Sweep_Flag']=bear.astype(int)
+    out['LSW_Bull_Sweep_Depth_ATR']=((prev_low-df['Low']).clip(lower=0)/(atr+1e-9))
+    out['LSW_Bear_Sweep_Depth_ATR']=((df['High']-prev_high).clip(lower=0)/(atr+1e-9))
+    rng=(df['High']-df['Low']).replace(0,np.nan); body=df['Close']-df['Open']
+    out['LSW_Rejection_Score']=(body/rng)*np.where(bear,-1,np.where(bull,1,0))
+    if 'Tick_Up_Count' in df.columns:
+        tot=(df['Tick_Up_Count']+df['Tick_Down_Count']).replace(0,np.nan)
+        delta=(df['Tick_Up_Count']-df['Tick_Down_Count'])/tot
+        out['LSW_Tick_Delta']=delta; out['LSW_Sweep_Tick_Align']=np.where(bull,delta,np.where(bear,-delta,0.0))
+    else:
+        out['LSW_Tick_Delta']=0.0; out['LSW_Sweep_Tick_Align']=0.0
+    idx=pd.Series(np.arange(len(df)),index=df.index)
+    out['LSW_Bars_Since_Bull_Sweep']=idx-idx.where(bull).ffill(); out['LSW_Bars_Since_Bear_Sweep']=idx-idx.where(bear).ffill()
+    return out.shift(1)
+
+def build_fvg_features(df):
+    out=pd.DataFrame(index=df.index); atr=calc_atr(df,14)
+    bull_gap=df['Low']-df['High'].shift(2); bear_gap=df['Low'].shift(2)-df['High']
+    is_bull=bull_gap>0; is_bear=bear_gap>0
+    bull_mid=((df['Low']+df['High'].shift(2))/2).where(is_bull).ffill()
+    bear_mid=((df['High']+df['Low'].shift(2))/2).where(is_bear).ffill()
+    idx=pd.Series(np.arange(len(df)),index=df.index)
+    out['FVG_Dist_Bull_ATR']=(df['Close']-bull_mid)/(atr+1e-9); out['FVG_Dist_Bear_ATR']=(df['Close']-bear_mid)/(atr+1e-9)
+    out['FVG_Bars_Since_Bull']=idx-idx.where(is_bull).ffill(); out['FVG_Bars_Since_Bear']=idx-idx.where(is_bear).ffill()
+    out['FVG_Bull_Size_ATR']=bull_gap.where(is_bull).ffill()/(atr+1e-9); out['FVG_Bear_Size_ATR']=bear_gap.where(is_bear).ffill()/(atr+1e-9)
+    return out.shift(1)
+
+
 def process_data_batch(pairs, tf, micro_n, macro_n, feature_groups, progress=gr.Progress()):
     if not pairs or "No Tick Data Found" in pairs:
         yield "❌ خطا: هیچ فایلی برای پردازش انتخاب نشده.", pd.DataFrame()
@@ -425,7 +505,7 @@ def process_data_batch(pairs, tf, micro_n, macro_n, feature_groups, progress=gr.
     tf_map = {'M1': '1min', 'M5': '5min', 'M15': '15min', 'M30': '30min', 'H1': '1h', 'H4': '4h', 'D1': '1D'}
     resample_rule = tf_map.get(tf, '15min')
     total_pairs = len(pairs)
-    final_message = f"🚀 عملیات روی {total_pairs} نماد آغاز شد (Structure Engine v24 FIXED - Zero Leak)...\n"
+    final_message = f"🚀 عملیات روی {total_pairs} نماد آغاز شد (Structure Engine v25 PIVOT-ALIGNED)...\n"
     last_tail_df = pd.DataFrame()
     yield final_message, last_tail_df
 
@@ -486,6 +566,11 @@ def process_data_batch(pairs, tf, micro_n, macro_n, feature_groups, progress=gr.
         fib_feats = build_fibonacci_features(df, n=int(micro_n)) if "Fibonacci Retracement (Swing-Relative)" in feature_groups else pd.DataFrame(index=df.index)
         pivot_wave_feats = build_pivot_wave_features(df, n=int(micro_n)) if "Pivot Wave Context (AB/BC Awareness)" in feature_groups else pd.DataFrame(index=df.index)
 
+        use_psa = "Pivot Settlement Aligned (PSA/LSW/FVG)" in feature_groups
+        psa_feats = build_pivot_settlement_aligned_features(df, n=int(micro_n)) if use_psa else pd.DataFrame(index=df.index)
+        lsw_feats = build_liquidity_sweep_features(df) if use_psa else pd.DataFrame(index=df.index)
+        fvg_feats = build_fvg_features(df) if use_psa else pd.DataFrame(index=df.index)
+
         progress(base_prog + (0.87 * prog_step), desc=f"[{pair}] 🧱 S/R Strength & Order Blocks...")
         sr_feats = build_sr_strength_features(df, n=int(micro_n)) if "Support/Resistance Strength" in feature_groups else pd.DataFrame(index=df.index)
         ob_feats = build_order_block_features(df) if "Order Blocks (ICT)" in feature_groups else pd.DataFrame(index=df.index)
@@ -512,7 +597,7 @@ def process_data_batch(pairs, tf, micro_n, macro_n, feature_groups, progress=gr.
         if "Volatility & Regime" in feature_groups: all_blocks.append(vol_feats)
         if "Liquidity & Tick Pressure" in feature_groups: all_blocks.append(liq_feats)
         if "Time Context" in feature_groups: all_blocks.append(time_feats)
-        all_blocks.extend([trend_feats, fractal_feats, longterm_feats, fib_feats, sr_feats, ob_feats, profile_feats, pivot_wave_feats])
+        all_blocks.extend([trend_feats, fractal_feats, longterm_feats, fib_feats, sr_feats, ob_feats, profile_feats, pivot_wave_feats, psa_feats, lsw_feats, fvg_feats])
         all_blocks.extend(mtf_blocks)
 
         df_final = pd.concat(all_blocks, axis=1)
@@ -539,17 +624,17 @@ def process_data_batch(pairs, tf, micro_n, macro_n, feature_groups, progress=gr.
         final_message += f"✅ {pair} تکمیل شد | ردیف‌ها: {len(df_final)} | ستون‌ها: {len(df_final.columns)}\n"
         last_tail_df = df_final.tail(50).reset_index()
         yield final_message, last_tail_df
-        del df, df_final, struct_micro, struct_macro, vol_feats, liq_feats, time_feats, trend_feats, fractal_feats, longterm_feats, fib_feats, sr_feats, ob_feats, profile_feats, pivot_wave_feats, mtf_blocks
+        del df, df_final, struct_micro, struct_macro, vol_feats, liq_feats, time_feats, trend_feats, fractal_feats, longterm_feats, fib_feats, sr_feats, ob_feats, profile_feats, pivot_wave_feats, psa_feats, lsw_feats, fvg_feats, mtf_blocks
         gc.collect()
 
-    final_message += "\n🏁 پایان عملیات Structure Engine FIXED."
+    final_message += "\n🏁 پایان عملیات Structure Engine v25 PIVOT-ALIGNED (PSA/LSW/FVG)."
     yield final_message, last_tail_df
 
-with gr.Blocks(title="HIPO STRUCTURE ENGINE v24 FIXED") as web_app:
+with gr.Blocks(title="HIPO STRUCTURE ENGINE v25 PIVOT-ALIGNED") as web_app:
     gr.HTML("""
         <div style="text-align: center; border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 20px;">
-            <h1 style="color: #00ff88; font-family: monospace; font-size: 30px;">🧠 HIPO STRUCTURE ENGINE v24 FIXED</h1>
-            <p style="color: #00f2ff; font-family: monospace;">Zero Leak (all shift1) + Killzone + Warmup Drop 250</p>
+            <h1 style="color: #00ff88; font-family: monospace; font-size: 30px;">🧠 HIPO STRUCTURE ENGINE v25 PIVOT-ALIGNED</h1>
+            <p style="color: #00f2ff; font-family: monospace;">Zero Leak + Killzone + PSA/LSW/FVG Pivot-Aligned Features</p>
         </div>
     """)
     with gr.Row():
@@ -565,10 +650,12 @@ with gr.Blocks(title="HIPO STRUCTURE ENGINE v24 FIXED") as web_app:
         "Long-Term Trend Slope (50/100/200)", "Fibonacci Retracement (Swing-Relative)",
         "Support/Resistance Strength", "Order Blocks (ICT)", "Price Profile (Volume-Free POC)",
         "Higher-Timeframe Structure (Real MTF, Anti-Leak)",
-        "Pivot Wave Context (AB/BC Awareness)"
+        "Pivot Wave Context (AB/BC Awareness)",
+        "Pivot Settlement Aligned (PSA/LSW/FVG)"
     ]
-    w_groups = gr.CheckboxGroup(choices=FEATURE_GROUP_CHOICES, value=FEATURE_GROUP_CHOICES, label="گروه‌های فیچر فعال")
-    w_btn = gr.Button("🚀 EXTRACT STRUCTURE FEATURES (FIXED)", variant="primary", size="lg")
+    default_groups = [g for g in FEATURE_GROUP_CHOICES if g != "Fractal Regime (Hurst/Fractal Dimension)"]
+    w_groups = gr.CheckboxGroup(choices=FEATURE_GROUP_CHOICES, value=default_groups, label="گروه‌های فیچر فعال")
+    w_btn = gr.Button("🚀 EXTRACT STRUCTURE FEATURES (v25 PIVOT-ALIGNED)", variant="primary", size="lg")
     w_msg = gr.Textbox(label="📡 وضعیت عملیات", lines=12)
     w_tail = gr.DataFrame(label="📊 نمونه‌ی ۵۰ ردیف آخر خروجی")
     w_btn.click(process_data_batch, inputs=[w_pairs, w_tf, w_micro_n, w_macro_n, w_groups], outputs=[w_msg, w_tail])
