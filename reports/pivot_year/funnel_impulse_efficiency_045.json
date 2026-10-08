@@ -1,0 +1,15 @@
+{
+  "ab_candidates": 4976,
+  "invalid_BC_retrace": 3566,
+  "B_break_before_BC_qualified": 652,
+  "invalid_A_wick_touch": 711,
+  "bc_qualified": 46,
+  "invalid_signal_or_FL": 30,
+  "invalid_CD_new_C": 8,
+  "signals_armed": 7,
+  "trigger_expired": 1,
+  "triggers": 1,
+  "invalid_AB_not_gt_CD": 6,
+  "BC_expired": 1,
+  "simultaneous_dropped": 0
+}

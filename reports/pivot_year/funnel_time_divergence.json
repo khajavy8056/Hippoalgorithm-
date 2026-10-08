@@ -1,0 +1,11 @@
+{
+  "ab_candidates": 2283,
+  "B_break_before_BC_qualified": 279,
+  "invalid_BC_retrace": 1526,
+  "invalid_A_wick_touch": 466,
+  "bc_qualified": 12,
+  "invalid_signal_or_FL": 7,
+  "invalid_CD_new_C": 2,
+  "signals_armed": 2,
+  "invalid_AB_not_gt_CD": 3
+}

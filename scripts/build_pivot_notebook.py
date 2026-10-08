@@ -25,11 +25,12 @@ md('''# پیوت تسویه — از PDF فارسی تا پژوهش تیک‌ب�
 ''')
 code(first)
 md((root/'reports/pivot/logic_spec_fa.md').read_text())
-code('# @title ۲ — موتور اجرا، قواعد پیوت و ابزار تطبیق\n'+''.join(embed(n) for n in ['engine','research','report','pivot','pivot_experiment','pivot_match'])+'''
+code('# @title ۲ — موتور اجرا، قواعد پیوت و ابزار تطبیق\n'+''.join(embed(n) for n in ['engine','research','report','pivot','pivot_experiment','pivot_match','pivot_long'])+'''
 from hippo_lab.engine import Execution,backtest
 from hippo_lab.pivot import PivotRules,pivot_bars,detect_pivots,FEATURE_COLUMNS
 from hippo_lab.pivot_experiment import run_pivot_experiment
 from hippo_lab.pivot_match import read_chart_bars,compare_images
+from hippo_lab.pivot_long import run_long_pivot
 execution=Execution(pair=PAIR,account_currency=ACCOUNT_CURRENCY)
 bars=pivot_bars(ticks,'1min')
 print('Closed BID M1 bars:',len(bars))
@@ -87,7 +88,13 @@ if CHART_CSV:
 else:
     print('Exact DAX screenshot reproduction: NOT VERIFIED — no matching OHLC supplied')
 ''')
-md('''## پروتکل آزمایش و مدل کاهش خطا
+md('''## ارزیابی تاریخچه بلند و پروتکل آزمایش
+
+در حالت local/histdata اکنون حداقل حدود یک سال Bid/Ask واقعی و پوشش روزهای کاری بررسی می‌شود؛ داده کوتاه به‌عنوان آزمون بلند پذیرفته نمی‌شود. گزارش تغییر اکوییتی OOS سالانه/فصلی جدا ذخیره می‌شود. این هنوز یک split است، نه اثبات پایداری یا چند fold.
+
+بررسی تکمیلی انجام‌شده روی ۳۷۵٬۱۹۴ کندل M1 سال۲۰۲۱ از آینه عمومی EURUSD فقط ساختاری بود: شروع از۱۱ژانویه، شش تاریخ کاری غایب، حدود۱۲٫۵٪ کندل تخت، ساعت منبع نامشخص و بدون Bid/Ask. baseline سخت‌گیرانه هیچ تریگر نداد؛ نسخه کلوز دو تریگر داد. بنابراین ادعای بازده، کاهش استاپ یا موفقیت مدل از این تاریخچه نمی‌کنیم. گزارش در reports/pivot_year است.
+
+## پروتکل آزمایش و مدل کاهش خطا
 
 چهار نسخه **همین منطق**: سایه/کلوز × TP۲٫۵/۳R. baseline از پیش `wick_2.5R` است؛ بهترین نتیجه تست انتخاب نمی‌شود. واگرایی زمانی فقط روی development به‌صورت تشخیصی گزارش می‌شود. تقسیم زمانی ۶۰٪ آموزش، ۲۰٪ اعتبارسنجی، ۲۰٪ آزمون؛ این اجرای اولیه exploratory است، نه ارزیابی چند fold. برای تأیید نهایی چندساله، بازار دیگر و >=۲۴ ماه OOS لازم است.
 
@@ -99,8 +106,13 @@ ML برچسب معاملات مستقل تیک‌به‌تیک همین ستاپ
 ''')
 code('''# @title ۵ — اجرای پژوهش، بک‌تست واقعی و گزارش جامع
 mode='sample' if DATA_MODE=='sample' else 'research'
-report,comparison,results=run_pivot_experiment(ticks,data_audit,execution,
-                                             folder='artifacts/pivot',mode=mode,bars=bars)
+if mode=='sample':
+    report,comparison,results=run_pivot_experiment(ticks,data_audit,execution,
+                                                 folder='artifacts/pivot',mode=mode,bars=bars)
+else:
+    # Enforce >=one calendar year of genuine quotes and inspect missing weekday coverage.
+    report,comparison,results=run_long_pivot(ticks,data_audit,execution,
+                                           folder='artifacts/pivot',minimum_days=365)
 Path('artifacts/pivot/image_review.csv').write_text(image_annotations.to_csv(index=False))
 print(json.dumps(report,indent=2,ensure_ascii=False,default=str))
 display(comparison)

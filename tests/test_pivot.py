@@ -122,3 +122,11 @@ def test_filter_fitting_and_thresholds_never_use_test_labels():
     assert t1==t2
     np.testing.assert_allclose(m1[-1].coef_,m2[-1].coef_)
     pd.testing.assert_frame_equal(tab1,tab2)
+
+
+def test_long_quote_gate_rejects_short_and_ohlc():
+    from hippo_lab.pivot_long import long_quote_gate
+    ix=pd.date_range('2024-01-01',periods=3,freq='min',tz='UTC')
+    quotes=pd.DataFrame({'bid':1.2,'ask':1.2001},index=ix)
+    with pytest.raises(ValueError,match='365'):long_quote_gate(quotes)
+    with pytest.raises(ValueError,match='bid AND ask'):long_quote_gate(fixture())
