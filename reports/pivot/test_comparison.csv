@@ -1,0 +1,6 @@
+variant,role,total_return,max_drawdown,trades,win_rate,profit_factor,net_pnl,mean_trade_pnl,gap_affected_trades,gap_affected_pnl,worst_realized_R,complete_months,drawdown_breaker_triggered,breaker_overshoot,submitted_signals,stale_or_outside_signals,mean_complete_month_return,fraction_months_ge_3pct,worst_month
+wick_2.5R,OOS sensitivity; NOT selected,0.0,0.0,0,,,0.0,,0,0.0,,0,False,0.0,0,0,,,
+wick_3R,OOS sensitivity; NOT selected,0.0,0.0,0,,,0.0,,0,0.0,,0,False,0.0,0,0,,,
+close_2.5R,OOS sensitivity; NOT selected,0.0,0.0,0,,,0.0,,0,0.0,,0,False,0.0,0,0,,,
+close_3R,OOS sensitivity; NOT selected,0.0,0.0,0,,,0.0,,0,0.0,,0,False,0.0,0,0,,,
+wick_2.5R_ML,OOS frozen filter or bypass,0.0,0.0,0,,,0.0,,0,0.0,,0,False,0.0,0,0,,,

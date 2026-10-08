@@ -1,0 +1,7 @@
+candidate,return,drawdown,trades,eligible,ml_fit,fold
+breakout_32,-0.0015810927056679747,0.007701031992600638,3,False,n/a,smoke_validation
+breakout_64,0.004804720872897628,0.0014839127264064667,1,False,n/a,smoke_validation
+reversion_32,0.0,0.0,0,False,n/a,smoke_validation
+reversion_64,0.0,0.0,0,False,n/a,smoke_validation
+logistic_060,0.0,0.0,0,False,insufficient,smoke_validation
+logistic_065,0.0,0.0,0,False,insufficient,smoke_validation
