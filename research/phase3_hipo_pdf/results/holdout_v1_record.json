@@ -1,0 +1,55 @@
+{
+ "note": "Recorded outputs of the ONE confirmation run on 2017-2022 made with the v1 (buggy) detector (files identical to buggy_v1/*). Recomputed from the archived trade files by research/phase3_hipo_pdf; not re-run and not used for any selection.",
+ "frozen_candidate_v1": {
+  "TF_min": 5,
+  "TP_R": 2.5,
+  "SL_BUF_ATR": 0.25,
+  "MIN_STOP_ATR": 2.0,
+  "CONF_BODY_ATR": 0.8,
+  "entry_window_UTC": [
+   7,
+   21
+  ],
+  "risk_pct": 1.5
+ },
+ "months_in_window_approx": 67,
+ "bar_level_M1_bidask": {
+  "trades": 14,
+  "win_pct": 28.57,
+  "mean_R": -0.105,
+  "pf": 0.84,
+  "final_equity": 9747.94,
+  "total_pct": -2.52,
+  "monthly_geo_pct": -0.038,
+  "max_dd_pct": 10.53,
+  "exit_reason_counts": {
+   "SL": 10,
+   "TP": 4
+  }
+ },
+ "tick_level_round1_engine": {
+  "trades": 14,
+  "win_pct": 28.57,
+  "final_equity": 9663.33,
+  "total_pct": -3.37,
+  "monthly_geo_pct": -0.051,
+  "max_dd_pct": 11.52,
+  "exit_reason_counts": {
+   "SL": 10,
+   "TP": 4
+  }
+ },
+ "earlier_peek_v1_as_written_defaults_2017_2022": {
+  "note": "from earlier session log (quick_run.py); bar-level; not re-verified here",
+  "risk_pct": 0.5,
+  "TF_min": 1,
+  "TP_R": 2.5,
+  "SL_BUF_ATR": 0.25,
+  "trades": 349,
+  "win_pct": 30.4,
+  "mean_R": -0.327,
+  "total_pct": -43.9,
+  "max_dd_pct": 46.8
+ },
+ "holdout_looks_for_HIPO_total": 2
+}
