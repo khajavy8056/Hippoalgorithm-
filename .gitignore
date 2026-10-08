@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.cache/
+data/
+google_drive/
+artifacts/
+*.pyc
+.ipynb_checkpoints/
+
+.hippo_notebook/
+HIPO_report.zip

@@ -1,0 +1,10 @@
+numpy>=2.2,<2.5
+pandas>=2.2,<3.1
+pyarrow>=18,<26
+numba>=0.61,<0.69
+scikit-learn>=1.6,<1.10
+matplotlib>=3.9,<3.12
+requests>=2.32,<3
+beautifulsoup4>=4.12,<5
+nbformat>=5.10,<6
+pytest>=8,<10

@@ -1,0 +1,7 @@
+candidate,role,total_return,max_drawdown,trades,win_rate,profit_factor,net_pnl,mean_trade_pnl,gap_affected_trades,gap_affected_pnl,worst_realized_R,complete_months,drawdown_breaker_triggered,breaker_overshoot,submitted_signals,stale_or_outside_signals,mean_complete_month_return,fraction_months_ge_3pct,worst_month
+breakout_32,SMOKE ONLY — not OOS,0.0019722493664049434,0.007701031992600749,4,0.5,1.3831090702819968,19.72249366404867,4.930623416011649,0,0.0,-1.0369145177053782,0,False,0.0,23,0,,,
+breakout_64,SMOKE ONLY — not OOS,0.007308425484984449,0.0036527258653514805,2,1.0,,73.084254849844,36.542127424922285,0,0.0,0.9966930131107433,0,False,0.0,14,0,,,
+reversion_32,SMOKE ONLY — not OOS,-0.0004324324324322948,0.0014592387165786036,1,0.0,0.0,-4.324324324323243,-4.324324324322639,1,-4.324324324322639,-0.1729729729729103,0,False,0.0,7,0,,,
+reversion_64,SMOKE ONLY — not OOS,0.0,0.0,0,,,0.0,,0,0.0,,0,False,0.0,3,0,,,
+logistic_060,SMOKE ONLY — not OOS,0.0,0.0,0,,,0.0,,0,0.0,,0,False,0.0,0,0,,,
+logistic_065,SMOKE ONLY — not OOS,0.0,0.0,0,,,0.0,,0,0.0,,0,False,0.0,0,0,,,
