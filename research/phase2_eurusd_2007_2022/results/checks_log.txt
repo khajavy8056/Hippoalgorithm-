@@ -1,0 +1,29 @@
+=== Engine sanity checks (oracle_check.py), discovery sample 2011, SL 1.5xATR5, RR 1, H 12 bars ===
+ORACLE (perfect direction)   n=  71584  NET meanR=+0.363 (pips +4.92)   GROSS meanR=+0.563 (pips +6.78)
+ANTI-ORACLE                  n=  71584  NET meanR=-0.759 (pips -8.68)   GROSS meanR=-0.576 (pips -6.91)
+RANDOM direction             n=  71584  NET meanR=-0.195 (pips -1.84)   GROSS meanR=-0.005 (pips -0.02)
+
+=== Real tick engine (engine_check.py) on frozen ML signals, window 2017-01..2022-06, 66 months ===
+(zero-cost = no spread, no slippage, no commission, no spread filter; default = engine defaults)
+cfg 1.5_1.0_12 | ZERO-COST    risk 0.25% | trades 3148 | MTM max DD  5.3% | mean monthly +0.87%
+cfg 1.5_1.0_12 | ZERO-COST    risk 0.50% | trades 3148 | MTM max DD 10.6% | mean monthly +1.74%
+cfg 1.5_1.0_12 | ZERO-COST    risk 1.00% | trades 3148 | MTM max DD 21.8% | mean monthly +3.28%
+cfg 1.5_1.0_12 | DEFAULT COST risk 0.50% | trades 3317 | MTM max DD 93.8% | mean monthly -4.03%
+cfg 2.0_1.5_48 | ZERO-COST    risk 0.25% | trades 1288 | MTM max DD  5.5% | mean monthly +0.24%
+cfg 2.0_1.5_48 | ZERO-COST    risk 0.50% | trades 1288 | MTM max DD 11.0% | mean monthly +0.48%
+cfg 2.0_1.5_48 | ZERO-COST    risk 1.00% | trades 1288 | MTM max DD 21.4% | mean monthly +1.02%
+cfg 2.0_1.5_48 | DEFAULT COST risk 0.50% | trades 1338 | MTM max DD 54.6% | mean monthly -1.05%
+
+=== Approximate frontier (screening only; from per-trade R sequences, discovery WF 2011-2016) ===
+cfg 1.5_1.0_12: cost multiplier k (1 = current model, 0 = zero cost) -> best monthly at DD<=10%
+  k=0.00: +3.00%/mo @risk 0.30% DD 9.3%
+  k=0.25: +1.57%/mo @risk 0.25% DD 9.4%
+  k=0.50: +0.39%/mo @risk 0.15% DD 8.7%
+  k=0.75: none positive;  k=1.00: none positive
+cfg 2.0_1.5_48: k=0.00: +1.46%/mo @0.30% DD 9.5%; k=0.50: +0.24%/mo; k>=0.75: none positive
+cfg 3.0_1.0_48: k=0.00: +1.52%/mo @0.40% DD 9.4%; k=0.50: +0.06%/mo; k>=0.75: none positive
+cfg 1.0_2.0_24: k=0.00: +2.98%/mo @0.30% DD 9.6%; k=0.50: +0.18%/mo; k>=0.75: none positive
+
+=== Approximate frontier, frozen diagnostic 2017-2022 (screening only) ===
+cfg 1.5_1.0_12: zero cost +1.84%/mo @0.45% DD 9.8%; zero commission: none positive; engine default: none positive
+cfg 2.0_1.5_48: zero cost +0.42%/mo @0.40% DD 9.6%; zero commission: none positive; engine default: none positive

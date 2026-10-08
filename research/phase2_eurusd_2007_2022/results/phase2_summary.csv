@@ -1,0 +1,15 @@
+family,config,stage,window,n_trades,mean_R_net,t_stat,mean_pips_net,gross_mean_R,extra,decision
+Trend (Donchian + ATR stop + ATR trailing),4h N=20 EMA200 trail=3ATR,discovery,2007-2016,975,0.002,0.07,,,best t of 20 configs (n>=150),selected for confirmation
+Trend (Donchian + ATR stop + ATR trailing),4h N=20 EMA200 trail=3ATR,confirmation,2017-2022,571,-0.119,-2.97,-6.91,,PF 0.73,FAILED
+Time-of-day scan (unconditional),"enter 21:00 UTC short, hold 4h",discovery,2007-2016,1832,,2.46,1.14,,1 of 768 configs with t>2,selected for confirmation
+Time-of-day scan (unconditional),"enter 21:00 UTC short, hold 4h",confirmation,2017-2022,910,,-8.16,-2.83,,,FAILED
+Daily TSMOM,"L=60d, hold 60d, stop 3xATR20D",discovery,2007-2016,77,0.357,1.94,,,PF 1.61,selected for confirmation
+Daily TSMOM,"L=60d, hold 60d, stop 3xATR20D",confirmation,2017-2022,49,0.047,0.24,,,PF 1.20,FAILED (not significant)
+M5 ML direct classifier,"SL 1.5xATR5, RR 1, H 12 bars (1h)",discovery WF (6 folds),2011-2016,7035,-0.050,-4.35,,0.102,AUC 0.54-0.56; 0/6 years positive,gate not passed; no confirmation
+M5 ML direct classifier,"SL 2.0xATR5, RR 1.5, H 48 bars (4h)",discovery WF (6 folds),2011-2016,4535,-0.039,-2.27,,0.077,AUC 0.52-0.55; 0/6 years positive,gate not passed; no confirmation
+M5 ML direct classifier,"SL 3.0xATR5, RR 1, H 48 bars (4h)",discovery WF (6 folds),2011-2016,5158,-0.042,-3.25,,0.053,AUC 0.52-0.54; 0/6 years positive,gate not passed; no confirmation
+M5 ML direct classifier,"SL 1.0xATR5, RR 2, H 24 bars (2h)",discovery WF (6 folds),2011-2016,5709,-0.096,-5.12,,0.125,AUC 0.54-0.57; 0/6 years positive,gate not passed; no confirmation
+M5 ML direct classifier (diagnostic),"SL 1.5xATR5, RR 1, H 12 bars (1h)","frozen model, no selection",2017-2022,3317,-0.170,-9.93,-0.74,0.081,mean cost 1.21 pips/trade,diagnostic only
+M5 ML direct classifier (diagnostic),"SL 2.0xATR5, RR 1.5, H 48 bars (4h)","frozen model, no selection",2017-2022,1338,-0.103,-3.22,-0.31,0.052,mean cost 1.21 pips/trade,diagnostic only
+M5 ML + quote-volume depth features,"SL 1.5xATR5, RR 1, H 12 bars (1h)",discovery WF (6 folds),2011-2016,6692,-0.050,-4.28,,0.098,AUC 0.54-0.565; no gain vs no-volume,gate not passed; no confirmation
+M5 ML + quote-volume depth features,"SL 2.0xATR5, RR 1.5, H 48 bars (4h)",discovery WF (6 folds),2011-2016,5544,-0.051,-3.31,,0.074,AUC 0.52-0.555; no gain vs no-volume,gate not passed; no confirmation
