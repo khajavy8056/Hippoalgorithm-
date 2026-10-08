@@ -57,3 +57,8 @@ python scripts/build_pivot_notebook.py
 `reports/pivot_year` شامل آزمایش ساختاری هشت نسخه روی۳۷۵٬۱۹۴ کندل عمومی EURUSD M1 است. داده از۱۱ژانویه شروع می‌شود و Bid/Ask ندارد؛ **نه یک سال کامل بک‌تست تیک و نه نتیجه سودآوری**. baseline صفر تریگر داد؛ close دو تریگر. گلوگاه اصلی در تشکیل BC/segmentation است، نه صرفاً آستانه مدل. شرح محدودیت و مسیر ادامه در `reports/pivot_year/README.md`.
 
 نوت‌بوک پیوت برای local/histdata حداقل تاریخچه حدودیک‌سال quote واقعی و پوشش روزکاری را می‌سنجد؛ گزارش مالی OOS سالانه/فصلی می‌دهد، اما هنوز یک تقسیم زمانی است و پایداری چندfold اثبات نشده است. ۲۸ تست نرم‌افزاری پاس شده‌اند.
+
+### تعمیم پیوت به مسیر قیمت (بدون الگوی شکل کندل)
+[نوت‌بوک مسیر قیمت در Colab](https://colab.research.google.com/github/khajavy8056/Hippoalgorithm-/blob/arena/5669e87d-hippoalgorithm/HIPO_Price_Path.ipynb)
+
+نسخه جدید در `hippo_lab/structural.py`: directional-change با نوسان گذشته، زمان وقوع/تأیید جدا و ورود بعد از تأیید D. شرط بدنه/رنگ/سایه حذف؛ AB/BC/CD و برگشت معکوس حفظ. هنوز closeهای M1 دارد و مستقل از sampling نیست. گزارش `reports/structure/report.html`: k۳ روی۲۰۲۱،۵۹۵ تریگر؛ نمونه quote یک‌هفته‌ای baseline با۱۱ معامله حدود−۱٫۰۶٪. افزایش فرصت تأیید شد، سودآوری/پایداری نه. داده قبلاً استفاده شده و holdout تازه نیست. ۳۳ تست نرم‌افزاری پاس شدند.

@@ -1,0 +1,14 @@
+{
+  "confirmed_pivots": 26755,
+  "ABCD_candidates": 26599,
+  "reject_impulse": 20141,
+  "qualified_ABC": 2851,
+  "B_broken": 1790,
+  "divergent_CD": 1242,
+  "reject_C_breached_at_trigger": 161,
+  "reject_no_B_break": 1061,
+  "reject_retrace": 3607,
+  "reject_CD_size": 548,
+  "reject_not_back_inside_B": 221,
+  "triggers": 860
+}
