@@ -1,0 +1,4 @@
+config,signals,full_trades,full_meanR,spread_only_trades,spread_only_meanR
+MR TF5 EMA20 z2.0 TP1.0 SL1.5,76643,8567,-0.1303,17523,-0.0625
+MR TF15 EMA60 z2.5 TP1.0 SL1.5,70205,14654,-0.0738,18436,-0.0094
+VBI TF15 N48 pq0.25 SL1.5 R2.5,2983,2168,-0.044,2168,0.0366
